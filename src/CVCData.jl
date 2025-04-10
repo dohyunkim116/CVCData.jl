@@ -6,7 +6,7 @@ using DelimitedFiles: readdlm, writedlm
 using JLD2
 using TextWrap, Glob
 
-export save_obj, CVCDataset, show
+export save_obj, CVCDataset, show, align
 
 include("GenoRaw.jl")
 include("Tools.jl")
@@ -55,6 +55,7 @@ end
 function CVCDataset(
     ga::GenoArch,
     gp::GenoPart,
+    part_genodir::AbstractString,
     covpath::AbstractString,
     covdir_parent::AbstractString,
     datasetobjdir::AbstractString
@@ -63,6 +64,16 @@ function CVCDataset(
     N = get_N(gp)
     M = get_M(gp)
     K = get_K(gp)
+    nldbins = get_nldbins(gp)
+    nmafbins = get_nmafbins(gp)
+    conditional_ldbin = get_conditional_ldbin(gp)
+    conditional_mafbin = get_conditional_mafbin(gp)
+    #part_genodir = get_part_genodir(gp)
+    ldtype = get_ldtype(gp)
+    M_k = get_m.(part_genodir, 1:K)
+    vc_array = Array{Vector{T}, 1}(undef, K)
+    vcmat = get_vcmat(ga)
+    set_vcarray!(vc_array, vcmat, part_genodir)
     covdir = Vector{AbstractString}(undef, 1)
     C = Vector{Int}(undef, 1)
     if isempty(covpath) || isempty(covdir_parent)
@@ -73,14 +84,12 @@ function CVCDataset(
     else
         mkpath(covdir_parent)
         @assert isfile(covpath) "Covariate file does not exist."
-        covdir[], w = align_cov(covpath, gp.part_genodir[], covdir_parent, gp.ldtype, ga.rho)
+        covdir[], w = align_cov(covpath, part_genodir, covdir_parent, ldtype, ga.rho)
         T = eltype(w)
         ηw = zeros(T, size(w, 1))
         update_fixed_effect_component!(ηw, w, ga.rng)
         C[] = size(w, 2)
     end
-    nldbins = get_nldbins(gp)
-    nmafbins = get_nmafbins(gp)
     h2 = get_h2(ga)
     h2hat = get_h2hat(ga)
     maflb = get_maflb(ga)
@@ -92,19 +101,13 @@ function CVCDataset(
     normalize = get_normalize(ga)
     phig = get_phig(ga)
     phie = get_phie(ga)
-    part_genodir = get_part_genodir(gp)
     phenodir_parent = Vector{AbstractString}(undef, 1)
     phenodir = similar(phenodir_parent)
     phenodir_parent[] = ""
     phenodir[] = ""
     rep = Vector{Int}(undef, 1)
-    M_k = get_m.(part_genodir, 1:K)
-    vc_array = Array{Vector{T}, 1}(undef, K)
-    vcmat = get_vcmat(ga)
-    set_vcarray!(vc_array, vcmat, part_genodir)
     datasetobjpath = Vector{AbstractString}(undef, 1)
-    conditional_ldbin = get_conditional_ldbin(gp)
-    conditional_mafbin = get_conditional_mafbin(gp)
+    
     cr = Vector{AbstractFloat}(undef, 1)
     cr[] = NaN
     CVCDataset(N, M, M_k, C, K, nldbins, nmafbins, h2, h2hat, cr, maflb, mafub, cvr, cvrhat, 
@@ -133,17 +136,16 @@ function align_cov(
     ldtype::Symbol,
     rho::Real=NaN
 )
-    w, header = readdlm("$(covpath)", header=true)
     fampath = get_fampath(part_genodir);
     k = get_k(part_genodir)
     fam = readdlm(fampath);
     feid = vec(string.(Int.(fam[:,1])));
-    wdf = DataFrame(w, vec(header));
+    wdf = CSV.read(covpath, DataFrame)
     wdf."f.eid" = string.(Int.(wdf."f.eid"))
     wdf = wdf[in.(wdf."f.eid", Ref(feid)), :]
     n = size(wdf, 1)
     c = size(wdf, 2) - 1
-    covdirname = "sim_cov_N_$(n)_C_$(c)_K_$(k)_ldtype_$(ldtype)_rho_$(rho)"
+    covdirname = "cov_N_$(n)_C_$(c)_K_$(k)_ldtype_$(ldtype)_rho_$(rho)"
     covdir = joinpath(covdir_parent, covdirname)
     mkpath(covdir)
     CSV.write("$(covdir)/w.txt", wdf[:,Not(:"f.eid")]; delim = "\t", header=false)
@@ -203,6 +205,61 @@ function Base.show(io::IO, s::CVCDataset)
     println("Showing simulation setting:")
     println_wrapped(output, width=50)
     println(io)
+end
+
+function align(
+    gp::GenoPart,
+    covdir::AbstractString,
+    )
+    covpath = "$covdir/wdf.txt"
+    wdf = CSV.read(covpath, DataFrame)
+    id_cov = string.(Int.(wdf."f.eid"))
+    part_genodir = gp.part_genodir[]
+    ldtype = gp.ldtype
+    rho = gp.rho
+    plink_binpath = gp.plink_binpath
+    fampath = get_fampath(part_genodir);
+    fam = readdlm(fampath);
+    id_geno = vec(string.(Int.(fam[:,1])));
+    if length(id_geno) == 0
+        error("No individuals in the genotype file.")
+    end
+    if id_geno == id_cov
+        println("No need to align covariate and genotype files.")
+        return
+    end
+    id = intersect(id_cov, id_geno)
+    n = length(id)
+    
+    mask = in.(string.(wdf."f.eid"), Ref(id))
+    w = wdf[mask, Not(:"f.eid")]
+    wdf = wdf[mask, :]
+    
+    c = size(w, 2)
+    K = get_k(part_genodir)
+    covdirparent = splitdir(covdir)[1]
+    covdirname = "aligned_cov_N_$(n)_C_$(c)_K_$(K)_rho_$(rho)_ldtype_$(ldtype)"
+    out_covdir = joinpath(covdirparent, covdirname)
+    partgenodirparent = splitdir(part_genodir)[1]
+    genodirname = "aligned_partgeno_N_$(n)_C_$(c)_K_$(K)_rho_$(rho)_ldtype_$(ldtype)"
+    out_partgenodir = joinpath(partgenodirparent, genodirname)
+    mkpath(out_covdir)
+    mkpath(out_partgenodir)
+    
+    # Write ID file with both FID and IID for PLINK
+    CSV.write("$out_partgenodir/id.txt", DataFrame(FID=id, IID=id); delim = "\t", header=false)
+    CSV.write("$out_covdir/wdf.txt", wdf; delim = "\t", header=true)
+    CSV.write("$out_covdir/w.txt", w; delim = "\t", header=false)
+    for k in 1:K
+        plink_cmd = `$plink_binpath/plink2 \
+        --bfile $part_genodir/G$(k) \
+        --keep-fam $out_partgenodir/id.txt \
+        --make-bed \
+        --out $out_partgenodir/G$(k)`
+        run(plink_cmd)
+    end
+    gp.part_genodir[] = out_partgenodir
+    out_covdir, out_partgenodir
 end
 
 include("Simulate.jl")

@@ -12,6 +12,7 @@ struct GenoPart
     N::Int
     M::Int
     K::Vector
+    rho::AbstractFloat
     chrs::Union{Vector{Int}, UnitRange{Int}, Int}
     mafknots::Vector
     nmafbins::Vector
@@ -54,7 +55,8 @@ function GenoPart(
     chrs = get_chrs(g)
     part_genodir = mktempdir(part_genodir_parent; cleanup=false)
     plink_binpath = get_plink_binpath(g)
-    gp = GenoPart(N, M, K, chrs, mafknots, [nmafbins], nldbins, qced_genodir, 
+    rho = g.rho
+    gp = GenoPart(N, M, K, rho, chrs, mafknots, [nmafbins], nldbins, qced_genodir, 
                 part_genodir_parent, [part_genodir], ldmafmat, ldtype, plink_binpath, 
                 part_genoobj_dir, conditional_ldbin, conditional_mafbin, nmafbins_per_interval,
                 g.imputed, isannot)
@@ -191,12 +193,12 @@ function update_part_genodir!(gp::GenoPart)
         if !gp.imputed
             newdir = 
                 "$(gp.part_genodir_parent)/part_geno_chrs_$(chrstart)_to_$(chrend)\
-                _N_$(gp.N)_M_$(gp.M)_ldtype_$(gp.ldtype)_K_$(gp.K[1])_nldbins_$(nldbins)_nmafbins_$(nmafbins)\
+                _N_$(gp.N)_M_$(gp.M)_K_$(gp.K[])_rho_$(gp.rho)_ldtype_$(gp.ldtype)_nldbins_$(nldbins)_nmafbins_$(nmafbins)\
                 _nmafbins_per_interval_$(nmafbins_per_interval)"
         else
             newdir = 
                 "$(gp.part_genodir_parent)/part_imputed_geno_chrs_$(chrstart)_to_$(chrend)\
-                _N_$(gp.N)_M_$(gp.M)_ldtype_$(gp.ldtype)_K_$(gp.K[1])_nldbins_$(nldbins)_nmafbins_$(nmafbins)\
+                _N_$(gp.N)_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)_ldtype_$(gp.ldtype)_nldbins_$(nldbins)_nmafbins_$(nmafbins)\
                 _nmafbins_per_interval_$(nmafbins_per_interval)"
         end
         
@@ -204,11 +206,11 @@ function update_part_genodir!(gp::GenoPart)
         if !gp.imputed
             newdir = 
                 "$(gp.part_genodir_parent)/annot_part_geno_chrs_$(chrstart)_to_$(chrend)\
-                _N_$(gp.N)_M_$(gp.M)_K_$(gp.K[1])"
+                _N_$(gp.N)_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)"
         else
             newdir = 
                 "$(gp.part_genodir_parent)/annot_part_imputed_geno_chrs_$(chrstart)_to_$(chrend)\
-                _N_$(gp.N)_M_$(gp.M)_K_$(gp.K[1])"
+                _N_$(gp.N)_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)"
         end
     end
     mv("$(gp.part_genodir[1])", newdir, force=true)
@@ -252,15 +254,15 @@ end
 function get_objname(gp::GenoPart)
     if !gp.isannot
         if gp.imputed
-            return "part_imputed_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N)_M_$(gp.M)_ldtype_$(gp.ldtype)_K_$(gp.K[1])"
+            return "part_imputed_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N)_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)_ldtype_$(gp.ldtype)"
         else
-            return "part_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N)_M_$(gp.M)_ldtype_$(gp.ldtype)_K_$(gp.K[1])"
+            return "part_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N)_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)_ldtype_$(gp.ldtype)"
         end
     else
         if gp.imputed
-            return "annot_part_imputed_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N)_M_$(gp.M)"
+            return "annot_part_imputed_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N)_M_$(gp.M)_rho_$(gp.rho)"
         else
-            return "annot_part_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N)_M_$(gp.M)"
+            return "annot_part_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N)_M_$(gp.M)_rho_$(gp.rho)"
         end
     end
 end
@@ -465,6 +467,7 @@ get_K(gp::GenoPart) = gp.K[1]
 get_part_genodir(gp::GenoPart) = gp.part_genodir[1]
 get_nldbins(gp::GenoPart) = gp.nldbins
 get_nmafbins(gp::GenoPart) = gp.nmafbins[1]
+get_ldtype(gp::GenoPart) = gp.ldtype
 get_ldmafmat(gp::GenoPart) = gp.ldmafmat
 get_sla_array(gp::GenoPart) = gp.sla_array
 get_conditional_ldbin(gp::GenoPart) = gp.conditional_ldbin

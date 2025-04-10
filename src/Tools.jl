@@ -23,11 +23,6 @@ function get_m(genodir::AbstractString, k::Int)
     M_k
 end
 
-# function get_c(covdir::AbstractString)
-#     w = readdlm(joinpath(covdir, "w.txt"))
-#     size(w, 2)
-# end
-
 get_k(genodir::AbstractString)=filter(contains(r"G\d+.fam"), readdir(genodir)) |> length
 
 function construct_sa_array!(sa_array::Array{SnpArray,1}, genopath::AbstractString)
