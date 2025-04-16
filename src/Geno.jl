@@ -450,12 +450,15 @@ _update_ldmafmat_rowid!(g::Geno) = g.ldmafmat[1][!, :rowid] = 1:size(g.ldmafmat[
 
 function save_obj(g::Geno)
     mkpath(g.qced_genoobj_dir)
-    JLD2.save_object(g.objpath[1], g)
+    #JLD2.save_object(g.objpath[1], g)
+    open("$(g.objpath[])", "w") do io
+        Serialization.serialize(io, g)
+    end
 end
 
 function update_objpath!(g::Geno)
-    g.objpath[1] = "$(g.qced_genoobj_dir)/$(get_objname(g)).jld2"
-    g.objpath[1]
+    g.objpath[] = "$(g.qced_genoobj_dir)/$(get_objname(g)).jls"
+    g.objpath[]
 end
 
 function get_objname(g::Geno)

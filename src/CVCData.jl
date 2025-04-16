@@ -3,7 +3,7 @@ module CVCData
 using Distributions, Random, SnpArrays, LinearAlgebra
 using DataFrames, CSV, StatsBase, Roots
 using DelimitedFiles: readdlm, writedlm
-using JLD2
+using Serialization
 using TextWrap, Glob
 
 export save_obj, CVCDataset, show, align!
@@ -131,11 +131,13 @@ end
 function save_obj(s::CVCDataset)
     mkpath(s.datasetobjdir)
     set_datasetobjpath!(s)
-    JLD2.save_object(s.datasetobjpath[], s)
+    open("$(s.datasetobjpath[])", "w") do io
+        Serialization.serialize(io, s)
+    end
 end
 
 function set_datasetobjpath!(s::CVCDataset)
-    s.datasetobjpath[] = "$(s.datasetobjdir)/$(get_objname(s)).jld2"
+    s.datasetobjpath[] = "$(s.datasetobjdir)/$(get_objname(s)).jls"
 end
 
 function get_objname(s::CVCDataset)

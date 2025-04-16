@@ -247,8 +247,11 @@ end
 
 function save_obj(gp::GenoPart)
     mkpath(gp.part_genoobj_dir)
-    objpath = "$(gp.part_genoobj_dir)/$(get_objname(gp)).jld2"
-    JLD2.save_object(objpath, gp)
+    objpath = "$(gp.part_genoobj_dir)/$(get_objname(gp)).jls"
+    #JLD2.save_object(objpath, gp)
+    open("$(objpath)", "w") do io
+        Serialization.serialize(io, gp)
+    end
 end
 
 function get_objname(gp::GenoPart)
