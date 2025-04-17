@@ -23,38 +23,38 @@ struct Geno
 end
 
 function Geno(
-    g_vec::Vector{Geno},
+    gs::Vector{Geno},
     qced_genodir_parent::AbstractString,
     qced_genoobj_dir::AbstractString
 )
-    @assert check_merge_condition(g_vec)
+    @assert check_merge_condition(gs)
     ldmafmat = sizehint!(DataFrame[], 1)
-    ldmafmat_array = [g.ldmafmat[1] for g in g_vec]
+    ldmafmat_array = [g.ldmafmat[1] for g in gs]
     push!(ldmafmat, reduce(vcat, ldmafmat_array))
-    plink_binpath = g_vec[1].plink_binpath
-    gcta_binpath = g_vec[1].gcta_binpath
-    ldak_binpath = g_vec[1].ldak_binpath
-    raw_genodir = g_vec[1].raw_genodir
-    raw_genobasename = g_vec[1].raw_genobasename
+    plink_binpath = gs[1].plink_binpath
+    gcta_binpath = gs[1].gcta_binpath
+    ldak_binpath = gs[1].ldak_binpath
+    raw_genodir = gs[1].raw_genodir
+    raw_genobasename = gs[1].raw_genobasename
     qced_genodir = Vector{AbstractString}(undef, 1)
-    chrs = reduce(vcat, [g.chrs for g in g_vec]) |> sort |> unique
-    geno = g_vec[1].geno
-    maf = g_vec[1].maf
-    N = g_vec[1].N
-    M = sum([g.M for g in g_vec])
-    ldtype = g_vec[1].ldtype
-    rho = g_vec[1].rho
-    imputed = g_vec[1].imputed
-    ldcomputed = g_vec[1].ldcomputed
+    chrs = reduce(vcat, [g.chrs for g in gs]) |> sort |> unique
+    geno = gs[1].geno
+    maf = gs[1].maf
+    N = gs[1].N
+    M = sum([g.M for g in gs])
+    ldtype = gs[1].ldtype
+    rho = gs[1].rho
+    imputed = gs[1].imputed
+    ldcomputed = gs[1].ldcomputed
     objpath = Vector{AbstractString}(undef, 1)
     g = Geno(plink_binpath, gcta_binpath, ldak_binpath, raw_genodir, raw_genobasename,
         qced_genodir_parent, qced_genodir, qced_genoobj_dir, chrs, geno, maf, ldmafmat, 
         N, M, ldtype, rho, imputed, ldcomputed, objpath)
-    update_qced_genodir_merged!(g, g_vec)
+    update_qced_genodir_merged!(g, gs)
     g.ldcomputed[1] ? _update_ldmafmat_rowid!(g) : nothing
     update_objpath!(g)
     save_obj(g)
-    for g in g_vec
+    for g in gs
         rm(g.objpath[1])
     end
     g
@@ -479,15 +479,15 @@ get_plink_binpath(g::Geno) = g.plink_binpath
 get_chrs(g::Geno) = g.chrs
 get_objpath(g::Geno) = isassigned(g.objpath, 1) ? g.objpath[1] : nothing
 
-function check_merge_condition(g_vec::Vector{Geno})
-    raw_genodirs = [g.raw_genodir for g in g_vec]
-    raw_genobasenames = [g.raw_genobasename for g in g_vec]
-    genos = [g.geno for g in g_vec]
-    mafs = [g.maf for g in g_vec]
-    ldtypes = [g.ldtype[1] for g in g_vec]
-    imputeds = [g.imputed for g in g_vec]
-    ldcomputeds = [g.ldcomputed[1] for g in g_vec]
-    Ns = [g.N[1] for g in g_vec]
+function check_merge_condition(gs::Vector{Geno})
+    raw_genodirs = [g.raw_genodir for g in gs]
+    raw_genobasenames = [g.raw_genobasename for g in gs]
+    genos = [g.geno for g in gs]
+    mafs = [g.maf for g in gs]
+    ldtypes = [g.ldtype[1] for g in gs]
+    imputeds = [g.imputed for g in gs]
+    ldcomputeds = [g.ldcomputed[1] for g in gs]
+    Ns = [g.N[1] for g in gs]
     @assert length(unique(raw_genodirs)) == 1 "Raw genotype file directories are not the same."
     @assert length(unique(raw_genobasenames)) == 1 "Raw genotype file base names are not the same."
     @assert length(unique(genos)) == 1 "Maximum missing genotype rates are not the same."
@@ -499,7 +499,7 @@ function check_merge_condition(g_vec::Vector{Geno})
     true
 end
 
-function update_qced_genodir_merged!(g_merged::Geno, g_vec::Vector{Geno})
+function update_qced_genodir_merged!(g_merged::Geno, gs::Vector{Geno})
     mkpath(g_merged.qced_genodir_parent)
     if g_merged.imputed
         merged_genodir = "$(g_merged.qced_genodir_parent)/qced_imputed_geno_chrs_$(g_merged.chrs[1])_to_$(g_merged.chrs[end])\
@@ -509,7 +509,7 @@ function update_qced_genodir_merged!(g_merged::Geno, g_vec::Vector{Geno})
         _N_$(g_merged.N[1])_M_$(g_merged.M[1])_ldtype_$(g_merged.ldtype[1])"
     end
     mkpath(merged_genodir)
-    for g in g_vec
+    for g in gs
         for file_path in readdir(g.qced_genodir[1], join=true)
             mv(file_path, "$(merged_genodir)/$(basename(file_path))", force = true)
         end
