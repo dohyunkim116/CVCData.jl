@@ -133,14 +133,14 @@ end
 function qc_snps!(
     g::Geno,
     subjectids_path::AbstractString,
-    snpdis_file_parentpath::AbstractString,
+    snpids_file_parentpath::AbstractString,
     snpids_file_basename::AbstractString,
     snpids_file_ext::AbstractString
 )
     
-    g.imputed ? nothing : snpids_path = get_snpids_path(snpdis_file_parentpath, snpids_file_basename, snpids_file_ext)
+    g.imputed ? nothing : snpids_path = get_snpids_path(snpids_file_parentpath, snpids_file_basename, snpids_file_ext)
     for chr in g.chrs
-        g.imputed ? snpids_path = get_snpids_path(snpdis_file_parentpath, snpids_file_basename, snpids_file_ext, chr) : nothing
+        g.imputed ? snpids_path = get_snpids_path(snpids_file_parentpath, snpids_file_basename, snpids_file_ext, chr) : nothing
         _qc_snps(
             g.plink_binpath, 
             g.raw_genodir, 
