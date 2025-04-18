@@ -196,7 +196,7 @@ function _qc_snps(
         
         # Clean up temporary files
         rm.(filter(f -> occursin(r".bim~|.fam~|.bed~", f), 
-            readdir(qced_genodir, join=true)))
+            readdir(qced_genodir, join=true)), force=true)
     else
         # For non-imputed data: Single command with all operations
         cmd_args = [
@@ -205,7 +205,7 @@ function _qc_snps(
         ]
         
         # Add SNP extraction if provided
-        !isempty(snpids_path) && push!(import_cmd_args, "--extract $snpids_path")
+        !isempty(snpids_path) && push!(cmd_args, "--extract $snpids_path")
         
         # Add common filters and output options
         append!(cmd_args, common_filters)
