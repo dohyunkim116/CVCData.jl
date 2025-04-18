@@ -75,9 +75,7 @@ function Geno(
     imputed::Bool=false;
     subjectids_keep_path::AbstractString="",
     sub_sample_size::Int=get_n(raw_genodir;imputed=imputed),
-    snpids_file_parentpath::AbstractString="",
-    snpids_file_basename::AbstractString="",
-    snpids_file_ext::AbstractString=""
+    snpidspath_template::AbstractString="" 
 )
     @assert geno >= 0.0 && geno <= 1.0 && maf >= 0.0 && maf <= 0.5 
         "geno should be in [0,1], and maf should be in [0,0.5]"
@@ -98,9 +96,7 @@ function Geno(
         g,
         subjectids_keep_path,
         sub_sample_size,
-        snpids_file_parentpath,
-        snpids_file_basename,
-        snpids_file_ext
+        snpidspath_template
     );
     update_qced_genodir!(g);
     update_objpath!(g)
@@ -112,9 +108,7 @@ function qc_snps!(
     g::Geno,
     subjectids_keep_path::AbstractString,
     sub_sample_size::Int,
-    snpids_file_parentpath::AbstractString,
-    snpids_file_basename::AbstractString,
-    snpids_file_ext::AbstractString
+    snpidspath_template::AbstractString
 )
     mkpath(g.qced_genodir_parent)
     g.qced_genodir[1] = mktempdir(g.qced_genodir_parent; cleanup=false)
@@ -125,7 +119,7 @@ function qc_snps!(
         sub_sample_size;
         imputed=g.imputed
     )
-    qc_snps!(g, subjectids_path, snpids_file_parentpath, snpids_file_basename, snpids_file_ext)
+    qc_snps!(g, subjectids_path, snpidspath_template)
     g.N[1] = get_n(g.qced_genodir[1])
     g.M[1] = sum(get_m.(g.qced_genodir[1], g.chrs))
 end
@@ -133,14 +127,10 @@ end
 function qc_snps!(
     g::Geno,
     subjectids_path::AbstractString,
-    snpids_file_parentpath::AbstractString,
-    snpids_file_basename::AbstractString,
-    snpids_file_ext::AbstractString
+    snpidspath_template::AbstractString
 )
-    
-    g.imputed ? nothing : snpids_path = get_snpids_path(snpids_file_parentpath, snpids_file_basename, snpids_file_ext)
     for chr in g.chrs
-        g.imputed ? snpids_path = get_snpids_path(snpids_file_parentpath, snpids_file_basename, snpids_file_ext, chr) : nothing
+        snpids_path = get_snpids_path(snpidspath_template, chr, g.imputed)
         _qc_snps(
             g.plink_binpath, 
             g.raw_genodir, 
@@ -168,82 +158,60 @@ function _qc_snps(
     maf::AbstractFloat=0.01,
     imputed::Bool=false
 )
-    if !imputed
-        if isempty(snpids_path)
-            cmd = `$plink_binpath/plink2 \
-            --bfile $(genodir)/$(genobasename)$chr \
-            --keep-fam $subjectids_path \
-            --geno $geno \
-            --maf $maf 'minor' \
-            --hwe midp 1e-7 \
-            --autosome \
-            --snps-only just-acgt \
-            --make-bed \
-            --out $(qced_genodir)/G$chr`
-            run(cmd)
-        else
-            cmd = `$plink_binpath/plink2 \
-            --bfile $(genodir)/$(genobasename)$chr \
-            --keep-fam $subjectids_path \
-            --extract $snpids_path \
-            --geno $geno \
-            --maf $maf 'minor' \
-            --hwe midp 1e-7 \
-            --autosome \
-            --snps-only just-acgt \
-            --make-bed \
-            --out $(qced_genodir)/G$chr`
-            run(cmd)
-        end
-    else
-        if isempty(snpids_path)
-            cmd = `$plink_binpath/plink2 \
-            --bgen $(genodir)/$(genobasename)$chr.bgen 'ref-first' \
-            --sample $(genodir)/$(genobasename)$chr.sample \
-            --hard-call-threshold 0.1 \
-            --import-dosage-certainty 0.9 \
-            --mach-r2-filter 0.3 \
-            --rm-dup 'exclude-mismatch' 'list' \
-            --keep-fam $subjectids_path \
-            --make-bed \
-            --out $(qced_genodir)/G$chr`
-            run(cmd)
-            cmd = `$plink_binpath/plink2 \
-            --bfile $(qced_genodir)/G$chr \
-            --geno $geno \
-            --maf $maf 'minor' \
-            --hwe midp 1e-7 \
-            --autosome \
-            --snps-only just-acgt \
-            --make-bed \
-            --out $(qced_genodir)/G$chr`
-            run(cmd)
-        else
-            cmd = `$plink_binpath/plink2 \
-            --bgen $(genodir)/$(genobasename)$chr.bgen 'ref-first' \
-            --sample $(genodir)/$(genobasename)$chr.sample \
-            --hard-call-threshold 0.1 \
-            --import-dosage-certainty 0.9 \
-            --mach-r2-filter 0.3 \
-            --rm-dup 'exclude-mismatch' 'list' \
-            --keep-fam $subjectids_path \
-            --extract $snpids_path \
-            --make-bed \
-            --out $(qced_genodir)/G$chr`
-            run(cmd)
-            cmd = `$plink_binpath/plink2 \
-            --bfile $(qced_genodir)/G$chr \
-            --geno $geno \
-            --maf $maf 'minor' \
-            --hwe midp 1e-7 \
-            --autosome \
-            --snps-only just-acgt \
-            --make-bed \
-            --out $(qced_genodir)/G$chr`
-            run(cmd)
-        end
+    bedfile_basename = "$(qced_genodir)/G$chr"
+    
+    # Common filters applied to both imputed and non-imputed data
+    common_filters = [
+        "--geno $geno",
+        "--maf $maf minor",
+        "--hwe midp 1e-7",
+        "--autosome",
+        "--snps-only just-acgt"
+    ]
+    
+    if imputed
+        # Step 1: Import data from BGEN format
+        import_cmd_args = [
+            "--bgen $(genodir)/$(genobasename)$chr.bgen 'ref-first'",
+            "--sample $(genodir)/$(genobasename)$chr.sample",
+            "--hard-call-threshold 0.1",
+            "--import-dosage-certainty 0.9",
+            "--mach-r2-filter 0.3",
+            "--rm-dup 'exclude-mismatch' 'list'",
+            "--keep-fam $subjectids_path"
+        ]
+        
+        # Add SNP extraction if provided
+        !isempty(snpids_path) && push!(import_cmd_args, "--extract $snpids_path")
+        
+        # Create BED files
+        push!(import_cmd_args, "--make-bed", "--out $bedfile_basename")
+        run(`$plink_binpath/plink2 $(split(join(import_cmd_args, " ")))`)
+        
+        # Step 2: Apply common filters
+        filter_cmd_args = ["--bfile $bedfile_basename"]
+        append!(filter_cmd_args, common_filters)
+        push!(filter_cmd_args, "--make-bed", "--out $bedfile_basename")
+        run(`$plink_binpath/plink2 $(split(join(filter_cmd_args, " ")))`)
+        
+        # Clean up temporary files
         rm.(filter(f -> occursin(r".bim~|.fam~|.bed~", f), 
             readdir(qced_genodir, join=true)))
+    else
+        # For non-imputed data: Single command with all operations
+        cmd_args = [
+            "--bfile $(genodir)/$(genobasename)$chr",
+            "--keep-fam $subjectids_path"
+        ]
+        
+        # Add SNP extraction if provided
+        !isempty(snpids_path) && push!(import_cmd_args, "--extract $snpids_path")
+        
+        # Add common filters and output options
+        append!(cmd_args, common_filters)
+        push!(cmd_args, "--make-bed", "--out $bedfile_basename")
+        
+        run(`$plink_binpath/plink2 $(split(join(cmd_args, " ")))`)
     end
 end
 
@@ -280,28 +248,17 @@ function get_subjectids_path(
     subjectids_path
 end
 
-function get_snpids_path(
-    snpids_file_parentpath::AbstractString="",
-    snpids_file_basename::AbstractString="",
-    snpids_file_ext::AbstractString="",
-    chr::Int=0
-)
-    if isempty(snpids_file_parentpath) || isempty(snpids_file_basename)
-        return ""
-    end
-    if iszero(chr)
-        if isempty(snpids_file_ext)
-            snpids_path = "$(snpids_file_parentpath)/$(snpids_file_basename)"
-        else
-            snpids_path = "$(snpids_file_parentpath)/$(snpids_file_basename).$(snpids_file_ext)"
-        end
+function get_snpids_path(snpidspath_template::AbstractString, chr::Int=0, imputed::Bool=false)
+    # Return empty string if snpidspath_template is empty
+    isempty(snpidspath_template) && return ""
+    
+    # For chromosome-specific requests
+    if chr > 0
+        return replace(snpidspath_template, "{chr}" => chr)
     else
-        @assert chr > 0 && chr < 23 "Chromosome number must be between 1 and 22."
-        if isempty(snpids_file_ext)
-            snpids_path = "$(snpids_file_parentpath)/$(snpids_file_basename)$(chr)"
-        else
-            snpids_path = "$(snpids_file_parentpath)/$(snpids_file_basename)$(chr).$(snpids_file_ext)"
-        end
+        # If requesting a global file but we're using per-chromosome files,
+        # just return empty string for both imputed and non-imputed data
+        return occursin("{chr}", snpidspath_template) ? "" : snpidspath_template
     end
 end
 
