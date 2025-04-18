@@ -32,7 +32,7 @@ function GenoArch(
     a::Real,
     b::Real;
     normalize::Bool=false,
-    rng::AbstractRNG=Random.MerseeneTwister(2024)
+    rng::AbstractRNG=Random.MersenneTwister(2025)
     )
     N = gp.N
     M = gp.M
