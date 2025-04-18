@@ -4,6 +4,7 @@ struct GenoArch
     N::Int
     M::Int
     rho::Real
+    genoarchobjdir::AbstractString
     qced_genodir::AbstractString
     ldmafmat::DataFrame
     ldtype::Symbol
@@ -22,7 +23,8 @@ struct GenoArch
 end
 
 function GenoArch(
-    g::Geno,
+    gp::GenoPart,
+    genoarchobjdir::AbstractString,
     h2::Real,
     maflb::Real,
     mafub::Real,
@@ -32,8 +34,12 @@ function GenoArch(
     normalize::Bool=false,
     rng::AbstractRNG=Random.MerseeneTwister(2024)
     )
-    ldmafmat = get_ldmafmat(g)
-    ldtype = g.ldtype[]
+    N = gp.N
+    M = gp.M
+    rho = gp.rho
+    qced_genodir = gp.qced_genodir
+    ldmafmat = gp.ldmafmat
+    ldtype = gp.ldtype
     update_ldmafmat_vc!(
         rng, ldmafmat, h2, maflb, mafub, cvr, a, b; 
         ldtype = ldtype, normalize = normalize
@@ -41,11 +47,13 @@ function GenoArch(
     phig = get_phig(ldmafmat)
     phie = get_phie(h2, ldmafmat, normalize)
     h2hat = phig / (phig + phie)
-    cvrhat = get_numcv(ldmafmat) / g.M[1]
-    GenoArch(g.N[1], g.M[1], g.rho, g.qced_genodir[1], ldmafmat,
+    cvrhat = get_numcv(ldmafmat) / M
+    ga = GenoArch(N, M, rho, genoarchobjdir, qced_genodir, ldmafmat,
             ldtype, h2, maflb, mafub, cvr, a, b, h2hat, 
             cvrhat, normalize, phig, phie, rng
     )
+    save_obj(ga)
+    return ga
 end
 
 get_N(ga::GenoArch) = ga.N
@@ -132,4 +140,46 @@ function Base.show(io::IO, ga::GenoArch)
     println("Showing genetic architecture setting:")
     println_wrapped(output, width=50)
     println(io)
+
+end
+
+function save_obj(ga::GenoArch)
+    outdir = ga.genoarchobjdir
+    mkpath(outdir)
+    objpath = "$(outdir)/$(get_objname(ga)).jls"
+    open("$(objpath)", "w") do io
+        Serialization.serialize(io, ga)
+    end
+    return objpath
+end
+
+function get_objname(ga::GenoArch)
+    # Format numbers for filename
+    h2_str = @sprintf("%.2f", ga.h2)
+    maflb_str = @sprintf("%.2f", ga.maflb)
+    mafub_str = @sprintf("%.2f", ga.mafub)
+    cvr_str = @sprintf("%.2f", ga.cvr)
+    a_str = @sprintf("%.2f", ga.a)
+    b_str = @sprintf("%.2f", ga.b)
+    
+    # Base filename with key parameters
+    base = "genoarch_h2_$(h2_str)_maf_$(maflb_str)_$(mafub_str)_cvr_$(cvr_str)"
+    
+    # Add architecture parameters
+    if ga.a != 0.0 || ga.b != 0.0
+        base *= "_a_$(a_str)_b_$(b_str)"
+    end
+    
+    # Add normalization status
+    if ga.normalize
+        base *= "_normalized"
+    end
+    
+    # Add LD type
+    base *= "_$(ga.ldtype)"
+    
+    # Add study dimensions
+    base *= "_N_$(ga.N)_M_$(ga.M)"
+    
+    return base
 end

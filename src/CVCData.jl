@@ -4,15 +4,15 @@ using Distributions, Random, SnpArrays, LinearAlgebra
 using DataFrames, CSV, StatsBase, Roots
 using DelimitedFiles: readdlm, writedlm
 using Serialization
-using TextWrap, Glob
+using TextWrap, Glob, Printf
 
 export save_obj, CVCDataset, show, align!
 
 include("GenoRaw.jl")
 include("Tools.jl")
 include("Geno.jl")
-include("GenoArch.jl")
 include("GenoPart.jl")
+include("GenoArch.jl")
 include("Covariate.jl")
 
 struct CVCDataset
