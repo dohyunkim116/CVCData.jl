@@ -47,7 +47,11 @@ function GenoArch(
     phig = get_phig(ldmafmat)
     phie = get_phie(h2, ldmafmat, normalize)
     h2hat = phig / (phig + phie)
-    cvrhat = get_numcv(ldmafmat) / M
+    
+    # Add debug prints for cvrhat calculation
+    numcv = get_numcv(ldmafmat)
+    cvrhat = numcv / M
+    
     ga = GenoArch(N, M, rho, genoarchobjdir, qced_genodir, ldmafmat,
             ldtype, h2, maflb, mafub, cvr, a, b, h2hat, 
             cvrhat, normalize, phig, phie, rng
@@ -75,29 +79,24 @@ function update_ldmafmat_vc!(
     ldtype::Symbol=:ldak,
     normalize::Bool=false    
     )
-    println("DEBUG: cvr = $cvr")
-    println("DEBUG: maflb = $maflb, mafub = $mafub")
-    flush(stdout)
+    total_snps = size(ldmafmat, 1)
     
+    # Calculate cvnum based on TOTAL SNPs (not just those in MAF range)
+    cvnum = Int(floor(cvr * total_snps))
+    
+    # Filter SNPs by MAF range
     rowmask = ldmafmat[:,:maf] .>= maflb .&& ldmafmat[:,:maf] .< mafub
-    println("DEBUG: Number of SNPs in MAF range (length(rowmask)) = $(sum(rowmask))")
-    flush(stdout)
+    snps_in_maf_range = sum(rowmask)
     
+    # Get candidate SNPs
     candcvsnprowids = ldmafmat[rowmask,:][:,:rowid]
-    println("DEBUG: Number of candidate SNPs (length(candcvsnprowids)) = $(length(candcvsnprowids))")
-    flush(stdout)
     
-    cvnum = Int(round(cvr * sum(rowmask)))
-    println("DEBUG: Number of SNPs to select (cvnum) = $cvnum")
-    flush(stdout)
     
-    if cvnum > length(candcvsnprowids)
-        println("DEBUG: ERROR - Trying to sample more SNPs than available!")
-        println("DEBUG: Will adjust cvnum to $(length(candcvsnprowids))")
-        cvnum = length(candcvsnprowids)
-        flush(stdout)
-    end
+    @assert cvnum <= length(candcvsnprowids) 
+    "Requested $cvnum causal variants ($(cvr * 100)% of total), \
+    but only $(length(candcvsnprowids)) SNPs available in MAF range [$maflb-$mafub]"
     
+    # Sample SNPs and compute variance components
     cvrowids = sample(rng, candcvsnprowids, cvnum, replace = false)
     cvrowmask = in.(ldmafmat[:,:rowid], Ref(cvrowids))
     vc = compute_vc.(
@@ -110,6 +109,21 @@ function update_ldmafmat_vc!(
         )
     ldmafmat[!,:vc] = normalize ? normalize_vc(vc, h2) : vc
     ldmafmat[!,:isnormalized] .= normalize
+    
+    # Verify causal variant count
+    actual_cvs = sum(ldmafmat[:,:vc] .> 0)
+    actual_cvrhat = actual_cvs / total_snps
+    expected_cvrhat = cvnum / total_snps
+    
+    # Check for significant differences
+    difference = abs(actual_cvrhat - expected_cvrhat)
+    threshold = max(0.0001, 0.01 * expected_cvrhat)
+    
+    if difference > threshold
+        error_msg = "CVR difference ($difference) exceeds threshold ($threshold): " *
+                   "Expected cvrhat = $expected_cvrhat, Actual cvrhat = $actual_cvrhat"
+        @assert difference <= threshold error_msg
+    end
 end
 
 function compute_vc(
