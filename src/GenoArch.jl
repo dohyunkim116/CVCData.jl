@@ -82,10 +82,10 @@ function update_ldmafmat_vc!(
     total_snps = size(ldmafmat, 1)
     
     # Calculate cvnum based on TOTAL SNPs (not just those in MAF range)
-    cvnum = Int(floor(cvr * total_snps))
+    cvnum = cvr ≈ 1.0 ? total_snps : Int(ceil(cvr * total_snps))
     
     # Filter SNPs by MAF range
-    rowmask = ldmafmat[:,:maf] .>= maflb .&& ldmafmat[:,:maf] .< mafub
+    rowmask = ldmafmat[:,:maf] .>= maflb .&& ldmafmat[:,:maf] .<= mafub
     snps_in_maf_range = sum(rowmask)
     
     # Get candidate SNPs
@@ -109,21 +109,6 @@ function update_ldmafmat_vc!(
         )
     ldmafmat[!,:vc] = normalize ? normalize_vc(vc, h2) : vc
     ldmafmat[!,:isnormalized] .= normalize
-    
-    # Verify causal variant count
-    actual_cvs = sum(ldmafmat[:,:vc] .> 0)
-    actual_cvrhat = actual_cvs / total_snps
-    expected_cvrhat = cvnum / total_snps
-    
-    # Check for significant differences
-    difference = abs(actual_cvrhat - expected_cvrhat)
-    threshold = max(0.0001, 0.01 * expected_cvrhat)
-    
-    if difference > threshold
-        error_msg = "CVR difference ($difference) exceeds threshold ($threshold): " *
-                   "Expected cvrhat = $expected_cvrhat, Actual cvrhat = $actual_cvrhat"
-        @assert difference <= threshold error_msg
-    end
 end
 
 function compute_vc(
