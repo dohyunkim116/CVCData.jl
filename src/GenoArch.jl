@@ -185,9 +185,8 @@ function get_objname(ga::GenoArch)
     base = "genoarch_h2_$(h2_str)_maf_$(maflb_str)_$(mafub_str)_cvr_$(cvr_str)"
     
     # Add architecture parameters
-    if ga.a != 0.0 || ga.b != 0.0
-        base *= "_a_$(a_str)_b_$(b_str)"
-    end
+    base *= "_a_$(a_str)_b_$(b_str)"
+    
     
     # Add normalization status
     if ga.normalize
