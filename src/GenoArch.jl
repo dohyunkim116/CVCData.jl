@@ -75,9 +75,29 @@ function update_ldmafmat_vc!(
     ldtype::Symbol=:ldak,
     normalize::Bool=false    
     )
+    println("DEBUG: cvr = $cvr")
+    println("DEBUG: maflb = $maflb, mafub = $mafub")
+    flush(stdout)
+    
     rowmask = ldmafmat[:,:maf] .>= maflb .&& ldmafmat[:,:maf] .< mafub
+    println("DEBUG: Number of SNPs in MAF range (length(rowmask)) = $(sum(rowmask))")
+    flush(stdout)
+    
     candcvsnprowids = ldmafmat[rowmask,:][:,:rowid]
-    cvnum = Int(round(cvr * length(rowmask)))
+    println("DEBUG: Number of candidate SNPs (length(candcvsnprowids)) = $(length(candcvsnprowids))")
+    flush(stdout)
+    
+    cvnum = Int(round(cvr * sum(rowmask)))
+    println("DEBUG: Number of SNPs to select (cvnum) = $cvnum")
+    flush(stdout)
+    
+    if cvnum > length(candcvsnprowids)
+        println("DEBUG: ERROR - Trying to sample more SNPs than available!")
+        println("DEBUG: Will adjust cvnum to $(length(candcvsnprowids))")
+        cvnum = length(candcvsnprowids)
+        flush(stdout)
+    end
+    
     cvrowids = sample(rng, candcvsnprowids, cvnum, replace = false)
     cvrowmask = in.(ldmafmat[:,:rowid], Ref(cvrowids))
     vc = compute_vc.(
