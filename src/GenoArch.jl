@@ -67,9 +67,10 @@ function update_ldmafmat_vc!(
     ldtype::Symbol=:ldak,
     normalize::Bool=false    
     )
-    rowmask = ldmafmat[:,:maf] .>= maflb .&& ldmafmat[:,:maf] .< mafub
+    rowmask = ldmafmat[:,:maf] .>= maflb .&& ldmafmat[:,:maf] .<= mafub
+    totalsnps = size(ldmafmat, 1)
     candcvsnprowids = ldmafmat[rowmask,:][:,:rowid]
-    cvnum = Int(round(cvr * length(rowmask)))
+    cvnum = Int(ceil(cvr * totalsnps))
     cvrowids = sample(rng, candcvsnprowids, cvnum, replace = false)
     cvrowmask = in.(ldmafmat[:,:rowid], Ref(cvrowids))
     vc = compute_vc.(
