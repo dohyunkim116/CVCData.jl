@@ -40,6 +40,7 @@ function GenoArch(
     qced_genodir = gp.qced_genodir
     ldtype = gp.ldtype
     ldmafmat = deepcopy(gp.ldmafmat)
+    @assert M == size(ldmafmat, 1) "ldmafmat should have M rows"
     update_ldmafmat_vc!(
         rng, ldmafmat, h2, maflb, mafub, cvr, a, b; 
         ldtype = ldtype, normalize = normalize
