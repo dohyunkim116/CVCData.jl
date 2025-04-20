@@ -165,153 +165,93 @@ end
 function align!(
     gp::GenoPart,
     covdir::AbstractString;
-    subjectidspath::Union{AbstractString, Nothing} = nothing,
-    phenopath::Union{AbstractString, Nothing} = nothing
+    subjectidspath::Union{AbstractString, Nothing}=nothing
     )
+    # Read covariate IDs
     covpath = "$covdir/wdf.txt"
     wdf = CSV.read(covpath, DataFrame)
     id_cov = string.(Int.(wdf."f.eid"))
-    part_genodir = gp.part_genodir[]
-    ldtype = gp.ldtype
-    rho = gp.rho
-    plink_binpath = gp.plink_binpath
-    fampath = get_fampath(part_genodir);
-    fam = readdlm(fampath);
-    id_geno = vec(string.(Int.(fam[:,1])));
-    @assert id_geno != 0 "No individuals in the genotype file."    
-    
-    # Initialize with intersection of covariate and genotype IDs
-    id = intersect(id_cov, id_geno)
-    
-    # Add subject ID intersection if provided
-    id_subject = nothing
-    if !isnothing(subjectidspath) && isfile(subjectidspath)
-        subject_data = readdlm(subjectidspath)
-        id_subject = vec(string.(Int.(subject_data[:,1])))
-        id = intersect(id, id_subject)
-    end
-    
-    # Add phenotype ID intersection if provided
-    id_pheno = nothing
-    pheno_df = nothing
-    pheno_basename = nothing
-    pheno_dirname = nothing
-    if !isnothing(phenopath) && isfile(phenopath)
-        pheno_df = CSV.read(phenopath, DataFrame)
-        pheno_basename = basename(phenopath)
-        pheno_dirname = basename(dirname(phenopath))
-        # Assume first column contains IDs - adjust if needed
-        id_pheno = string.(Int.(pheno_df[:,1]))
-        id = intersect(id, id_pheno)
-    end
-    
-    n = length(id)
-    @assert n > 0 "No individuals remain after intersection of all provided ID sets."
-    
-    # Check if ACTUAL alignment is needed - only true if any id set differs from intersection
-    need_alignment = (id != id_cov) || (id != id_geno) || 
-                     (!isnothing(id_subject) && id != id_subject) || 
-                     (!isnothing(id_pheno) && id != id_pheno)
-    
-    # If no alignment is needed and no additional files, just return original directories
-    if !need_alignment && isnothing(phenopath) && isnothing(subjectidspath)
-        return covdir, part_genodir
-    end
-    
-    K = get_k(part_genodir)
-    covdirparent = splitdir(covdir)[1]
-    partgenodirparent = splitdir(part_genodir)[1]
-    
-    # Create directory name components based on what's being aligned
-    c = size(wdf, 2) - 1
-    covdirname = "aligned_cov_N_$(n)_C_$(c)_K_$(K)_rho_$(rho)_ldtype_$(ldtype)"
-    out_covdir = joinpath(covdirparent, covdirname)
-    
-    genodirname = "aligned_partgeno_N_$(n)_C_$(c)_K_$(K)_rho_$(rho)_ldtype_$(ldtype)"
-    out_partgenodir = joinpath(partgenodirparent, genodirname)
-    
-    # Only create output directories if alignment is needed
-    if need_alignment
-        mkpath(out_covdir)
-        mkpath(out_partgenodir)
-        
-        # Create the aligned ID file
-        CSV.write("$out_partgenodir/id.txt", DataFrame(FID=id, IID=id); delim = "\t", header=false)
-        
-        # Filter covariate data
-        mask = in.(string.(wdf."f.eid"), Ref(id))
-        w = wdf[mask, Not(:"f.eid")]
-        wdf = wdf[mask, :]
-        
-        # Write covariate data
-        CSV.write("$out_covdir/wdf.txt", wdf; delim = "\t", header=true)
-        CSV.write("$out_covdir/w.txt", w; delim = "\t", header=false)
-        
-        # Create filtered genotype files
-        for k in 1:K
-            plink_cmd = `$plink_binpath/plink2 \
-            --bfile $part_genodir/G$(k) \
-            --keep-fam $out_partgenodir/id.txt \
-            --make-bed \
-            --out $out_partgenodir/G$(k)`
-            run(plink_cmd)
-        end
-    else
-        # No alignment needed, but we still need directories for additional files
-        mkpath(out_covdir)
-        mkpath(out_partgenodir)
-        CSV.write("$out_partgenodir/id.txt", DataFrame(FID=id, IID=id); delim = "\t", header=false)
-        
-        # Create symbolic links for covariate files
-        for file in ["wdf.txt", "w.txt"]
-            src = joinpath(covdir, file)
-            dst = joinpath(out_covdir, file)
-            isfile(dst) && rm(dst)
-            isfile(src) && symlink(src, dst)
-        end
 
-        # Create symbolic links for genotype files
+    # Read genotype IDs
+    part_genodir = gp.part_genodir[]
+    fampath = get_fampath(part_genodir)
+    fam = readdlm(fampath)
+    id_geno = vec(string.(Int.(fam[:,1])))
+    @assert !isempty(id_geno) "No individuals in the genotype file."
+
+    # Intersection of cov & geno IDs
+    id = intersect(id_cov, id_geno)
+
+    # Optional subject ID filtering
+    if !isnothing(subjectidspath) && isfile(subjectidspath)
+        subj = readdlm(subjectidspath)
+        id_subj = vec(string.(Int.(subj[:,1])))
+        id = intersect(id, id_subj)
+    end
+
+    @assert !isempty(id) "No individuals remain after intersection."
+
+    # Determine if alignment is needed via element‐wise checks
+    cov_ok  = length(id) == length(id_cov)  && all(id .== id_cov)
+    geno_ok = length(id) == length(id_geno) && all(id .== id_geno)
+    # if subjectidspath was used, check that too
+    subj_ok = true
+    if !isnothing(subjectidspath) && isfile(subjectidspath)
+        id_subj = vec(string.(Int.(readdlm(subjectidspath)[:,1])))
+        subj_ok = length(id) == length(id_subj) && all(id .== id_subj)
+    end
+    need_alignment = !(cov_ok && geno_ok && subj_ok)
+
+    # Prepare output paths
+    n = length(id)
+    c = size(wdf,2)-1
+    K = get_k(part_genodir)
+    covdir_parent = dirname(covdir)
+    geno_parent   = dirname(part_genodir)
+
+    cov_out  = joinpath(covdir_parent,
+        "aligned_cov_N_$(n)_C_$(c)_K_$(K)_rho_$(gp.rho)_ldtype_$(gp.ldtype)")
+    geno_out = joinpath(geno_parent,
+        "aligned_partgeno_N_$(n)_C_$(c)_K_$(K)_rho_$(gp.rho)_ldtype_$(gp.ldtype)")
+
+    if need_alignment
+        mkpath(cov_out);  mkpath(geno_out)
+        # write aligned IDs and filter
+        CSV.write("$geno_out/id.txt", DataFrame(FID=id, IID=id);
+                  delim="\t", header=false)
+        mask = in.(string.(wdf."f.eid"), Ref(id))
+        w   = wdf[mask, Not(:"f.eid")]
+        wdf = wdf[mask, :]
+        CSV.write("$cov_out/wdf.txt", wdf; delim="\t", header=true)
+        CSV.write("$cov_out/w.txt",   w;    delim="\t", header=false)
+
+        # PLINK‐filter genotype
         for k in 1:K
-            for ext in [".bed", ".bim", ".fam"]
-            src = joinpath(part_genodir, "G$k$ext")
-            dst = joinpath(out_partgenodir, "G$k$ext")
-            isfile(dst) && rm(dst)
-            isfile(src) && symlink(src, dst)
-            end
+            cmd = `$gp.plink_binpath/plink2 \
+                   --bfile $part_genodir/G$(k) \
+                   --keep-fam $geno_out/id.txt \
+                   --make-bed \
+                   --out $geno_out/G$(k)`
+            run(cmd)
         end
-    end
-    
-    # Handle phenotype data if provided
-    out_phenodir = nothing
-    if !isnothing(phenopath)
-        # Get phenotype parent directory automatically
-        phenodir_parent = dirname(phenopath)
-        
-        # Create a simple aligned phenotype directory name
-        out_phenodir = joinpath(phenodir_parent, "aligned_$(pheno_dirname)")
-        mkpath(out_phenodir)
-        
-        if need_alignment && !isnothing(pheno_df)
-            # Filter phenotype data
-            pheno_mask = in.(string.(Int.(pheno_df[:,1])), Ref(id))
-            pheno_filtered = pheno_df[pheno_mask, :]
-            CSV.write(joinpath(out_phenodir, pheno_basename), pheno_filtered; delim = "\t")
-        else
-            # Just create a symbolic link
-            dst = joinpath(out_phenodir, pheno_basename)
-            isfile(dst) && rm(dst)
-            symlink(phenopath, dst)
-        end
-    end
-    
-    gp.part_genodir[] = out_partgenodir
-    
-    # Return appropriate directories
-    if !isnothing(out_phenodir)
-        return out_covdir, out_partgenodir, out_phenodir
     else
-        return out_covdir, out_partgenodir
+        # no alignment → symlink originals
+        mkpath(cov_out);  mkpath(geno_out)
+        CSV.write("$geno_out/id.txt", DataFrame(FID=id, IID=id);
+                  delim="\t", header=false)
+        for f in ["wdf.txt","w.txt"]
+            src, dst = joinpath(covdir,f), joinpath(cov_out,f)
+            isfile(dst) && rm(dst);  isfile(src) && symlink(src,dst)
+        end
+        for k in 1:K, ext in [".bed",".bim",".fam"]
+            src, dst = joinpath(part_genodir,"G$k$ext"), joinpath(geno_out,"G$k$ext")
+            isfile(dst) && rm(dst);  isfile(src) && symlink(src,dst)
+        end
     end
+
+    # Update gp and return only the two dirs
+    gp.part_genodir[] = geno_out
+    return cov_out, geno_out
 end
 
 function check_alignment(
