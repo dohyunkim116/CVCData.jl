@@ -94,10 +94,12 @@ function CVCDataset(
     datasetobjpath = Vector{AbstractString}(undef, 1)
     cr = Vector{AbstractFloat}(undef, 1)
     cr[] = NaN
-    CVCDataset(N, M, M_k, C, K, nldbins, nmafbins, h2, h2hat, cr, maflb, mafub, cvr, cvrhat, 
+    dataset = CVCDataset(N, M, M_k, C, K, nldbins, nmafbins, h2, h2hat, cr, maflb, mafub, cvr, cvrhat, 
                 a, b, part_genodir, covdir, phenodir_parent, phenodir, ηw, 
                 vc_array, rep, datasetobjdir, datasetobjpath, normalize, 
                 phig, phie, conditional_ldbin, conditional_mafbin, ga.rng, gp.ldtype, ga.rho)
+    save_obj(dataset)
+    return dataset
 end
 
 function set_vcarray!(
