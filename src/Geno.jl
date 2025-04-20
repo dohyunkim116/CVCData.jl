@@ -1,3 +1,5 @@
+using Random  # make sure this is at the top of the file
+
 export Geno, update_ldmafmat!, get_objpath
 
 struct Geno
@@ -378,29 +380,81 @@ function _compute_ld(
     tempdir_path::AbstractString,
     gcta_binpath::AbstractString,
     ldak_binpath::AbstractString;
-    ldtype::Symbol=:ldsc,
-    ldwind::Int=2000
-    )
+    ldtype::Symbol           = :ldsc,
+    ldwind::Int              = 2000,
+    subsample_threshold::Int = 5000,
+    subsample_size::Int      = 5000
+)
     @assert ldtype == :ldsc || ldtype == :ldak
+
+    # auto‐detect number of threads (SGE’s NSLOTS or Julia threads)
+    nthreads = haskey(ENV, "NSLOTS") ? parse(Int, ENV["NSLOTS"]) : Threads.nthreads()
+    println(">>> Detected $nthreads threads; will pass to ", ldtype == :ldsc ? "GCTA" : "LDAK")
+
     if ldtype == :ldsc
+        # — GCTA‐LD‐score branch —
+        println(">>> Launching GCTA with $nthreads threads")
         gctacmd = `$gcta_binpath/gcta-1.94.1 \
+                    --thread-num $nthreads \
                     --bfile $genodir/$genobasename$chr \
                     --ld-score \
                     --ld-wind $ldwind \
                     --out $tempdir_path/$genobasename$chr`
         run(gctacmd)
-        data, header = readdlm("$tempdir_path/$(genobasename)$(chr).score.ld", header=true);
+
+        data, header = readdlm(
+            joinpath(tempdir_path, "$(genobasename)$(chr).score.ld"),
+            header=true
+        )
+
     else
-        ldakcmd1 = `$ldak_binpath/ldak5.2  \
+        # — LDAK branch with optional subsampling —
+        println(">>> Preparing subsampling for LDAK (threshold=$subsample_threshold)")
+        famfile   = joinpath(genodir, "$(genobasename)$(chr).fam")
+        fam_lines = readlines(famfile)
+        fam_data  = split.(fam_lines)    # Vector of [FID, IID, …]
+        n_samples = length(fam_data)
+
+        # build keep‐file if above threshold
+        keepfile = ""
+        if n_samples > subsample_threshold
+            println(">>> Subsampling $subsample_size of $n_samples individuals for LDAK")
+            ids      = sample(1:n_samples, min(subsample_size, n_samples), replace=false)
+            keepfile = joinpath(tempdir_path, "ldak_keep_chr$(chr).txt")
+            open(keepfile, "w") do io
+                for i in ids
+                    fid, iid = fam_data[i][1], fam_data[i][2]
+                    println(io, fid, ' ', iid)
+                end
+            end
+        end
+
+        # helper to inject --keep if needed
+        inject_keep(cmd::Cmd) = isempty(keepfile) ? cmd : `$cmd --keep $keepfile`
+
+        # run LDAK cut‐weights
+        println(">>> Launching LDAK cut-weights with $nthreads threads")
+        ldakcmd1 = `$ldak_binpath/ldak5.2 \
+                    --max-threads $nthreads \
                     --cut-weights $tempdir_path/sections$chr \
                     --bfile $genodir/$genobasename$chr`
+        run(inject_keep(ldakcmd1))
+
+        # run LDAK calc‐weights-all
+        println(">>> Launching LDAK calc-weights-all with $nthreads threads")
         ldakcmd2 = `$ldak_binpath/ldak5.2 \
+                    --max-threads $nthreads \
                     --calc-weights-all $tempdir_path/sections$chr \
                     --bfile $genodir/$genobasename$chr`
-        run(ldakcmd1); run(ldakcmd2);
-        data, header = readdlm("$tempdir_path/sections$(chr)/weights.all", header=true);
+        run(inject_keep(ldakcmd2))
+
+        data, header = readdlm(
+            joinpath(tempdir_path, "sections$(chr)/weights.all"),
+            header=true
+        )
     end
-    data, header
+
+    return data, header
 end
 
 _update_ldmafmat_rowid!(g::Geno) = g.ldmafmat[1][!, :rowid] = 1:size(g.ldmafmat[1], 1);
