@@ -11,8 +11,8 @@ export save_obj, CVCDataset, show, align!
 include("GenoRaw.jl")
 include("Tools.jl")
 include("Geno.jl")
-include("GenoArch.jl")
 include("GenoPart.jl")
+include("GenoArch.jl")
 include("Covariate.jl")
 
 struct CVCDataset

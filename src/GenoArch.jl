@@ -23,7 +23,7 @@ struct GenoArch
 end
 
 function GenoArch(
-    g::Geno,
+    gp::GenoPart,
     genoarchobjdir::AbstractString,
     h2::Real,
     maflb::Real,
@@ -32,10 +32,14 @@ function GenoArch(
     a::Real,
     b::Real;
     normalize::Bool=false,
-    rng::AbstractRNG=Random.MerseeneTwister(2024)
+    rng::AbstractRNG=Random.MersenneTwister(2024)
     )
-    ldmafmat = get_ldmafmat(g)
-    ldtype = g.ldtype[]
+    N = gp.N
+    M = gp.M
+    rho = gp.rho
+    qced_genodir = gp.qced_genodir
+    ldtype = gp.ldtype
+    ldmafmat = deepcopy(gp.ldmafmat)
     update_ldmafmat_vc!(
         rng, ldmafmat, h2, maflb, mafub, cvr, a, b; 
         ldtype = ldtype, normalize = normalize
@@ -43,8 +47,8 @@ function GenoArch(
     phig = get_phig(ldmafmat)
     phie = get_phie(h2, ldmafmat, normalize)
     h2hat = phig / (phig + phie)
-    cvrhat = get_numcv(ldmafmat) / g.M[1]
-    ga = GenoArch(g.N[1], g.M[1], g.rho, genoarchobjdir, g.qced_genodir[1], ldmafmat,
+    cvrhat = get_numcv(ldmafmat) / M
+    ga = GenoArch(N, M, rho, genoarchobjdir, qced_genodir, ldmafmat,
             ldtype, h2, maflb, mafub, cvr, a, b, h2hat, 
             cvrhat, normalize, phig, phie, rng
     )
