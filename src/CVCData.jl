@@ -4,7 +4,7 @@ using Distributions, Random, SnpArrays, LinearAlgebra
 using DataFrames, CSV, StatsBase, Roots
 using DelimitedFiles: readdlm, writedlm
 using Serialization
-using TextWrap, Glob
+using TextWrap, Glob, Printf
 
 export save_obj, CVCDataset, show, align!
 
