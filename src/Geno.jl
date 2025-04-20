@@ -171,7 +171,7 @@ function _qc_snps(
     
     if imputed
         # Step 1: Import data from BGEN format
-        import_cmd_args = [
+        bgen_cmd_args = [
             "--bgen $(genodir)/$(genobasename)$chr.bgen 'ref-first'",
             "--sample $(genodir)/$(genobasename)$chr.sample",
             "--hard-call-threshold 0.1",
@@ -182,36 +182,36 @@ function _qc_snps(
         ]
         
         # Add SNP extraction if provided
-        !isempty(snpids_path) && push!(import_cmd_args, "--extract $snpids_path")
+        !isempty(snpids_path) && push!(bgen_cmd_args, "--extract $snpids_path")
         
         # Create BED files
-        push!(import_cmd_args, "--make-bed", "--out $bedfile_basename")
-        run(`$plink_binpath/plink2 $(split(join(import_cmd_args, " ")))`)
+        push!(bgen_cmd_args, "--make-bed", "--out $bedfile_basename")
+        run(`$plink_binpath/plink2 $(split(join(bgen_cmd_args, " ")))`)
         
         # Step 2: Apply common filters
-        filter_cmd_args = ["--bfile $bedfile_basename"]
-        append!(filter_cmd_args, common_filters)
-        push!(filter_cmd_args, "--make-bed", "--out $bedfile_basename")
-        run(`$plink_binpath/plink2 $(split(join(filter_cmd_args, " ")))`)
+        bed_cmd_args = ["--bfile $bedfile_basename"]
+        append!(bed_cmd_args, common_filters)
+        push!(bed_cmd_args, "--make-bed", "--out $bedfile_basename")
+        run(`$plink_binpath/plink2 $(split(join(bed_cmd_args, " ")))`)
         
         # Clean up temporary files
         rm.(filter(f -> occursin(r".bim~|.fam~|.bed~", f), 
             readdir(qced_genodir, join=true)))
     else
         # For non-imputed data: Single command with all operations
-        cmd_args = [
+        bed_cmd_args = [
             "--bfile $(genodir)/$(genobasename)$chr",
             "--keep-fam $subjectids_path"
         ]
         
         # Add SNP extraction if provided
-        !isempty(snpids_path) && push!(import_cmd_args, "--extract $snpids_path")
+        !isempty(snpids_path) && push!(bed_cmd_args, "--extract $snpids_path")
         
         # Add common filters and output options
-        append!(cmd_args, common_filters)
-        push!(cmd_args, "--make-bed", "--out $bedfile_basename")
+        append!(bed_cmd_args, common_filters)
+        push!(bed_cmd_args, "--make-bed", "--out $bedfile_basename")
         
-        run(`$plink_binpath/plink2 $(split(join(cmd_args, " ")))`)
+        run(`$plink_binpath/plink2 $(split(join(bed_cmd_args, " ")))`)
     end
 end
 
