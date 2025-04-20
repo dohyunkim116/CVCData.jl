@@ -162,8 +162,13 @@ function _qc_snps(
 )
     bedfile_basename = "$(qced_genodir)/G$chr"
     
+    # Auto-detect number of threads (SGE's NSLOTS or Julia threads)
+    nthreads = haskey(ENV, "NSLOTS") ? parse(Int, ENV["NSLOTS"]) : Threads.nthreads()
+    println(">>> Detected $nthreads threads; will pass to PLINK2")
+    
     # Common filters applied to both imputed and non-imputed data
     common_filters = [
+        "--threads $nthreads", # Add threading support to all PLINK commands
         "--geno $geno",
         "--maf $maf minor",
         "--hwe midp 1e-7",
@@ -174,6 +179,7 @@ function _qc_snps(
     if imputed
         # Step 1: Import data from BGEN format
         bgen_cmd_args = [
+            "--threads $nthreads", # Add threading support to BGEN import
             "--bgen $(genodir)/$(genobasename)$chr.bgen 'ref-first'",
             "--sample $(genodir)/$(genobasename)$chr.sample",
             "--hard-call-threshold 0.1",
@@ -188,12 +194,14 @@ function _qc_snps(
         
         # Create BED files
         push!(bgen_cmd_args, "--make-bed", "--out $bedfile_basename")
+        println(">>> Running PLINK2 BGEN import with $nthreads threads")
         run(`$plink_binpath/plink2 $(split(join(bgen_cmd_args, " ")))`)
         
         # Step 2: Apply common filters
         bed_cmd_args = ["--bfile $bedfile_basename"]
         append!(bed_cmd_args, common_filters)
         push!(bed_cmd_args, "--make-bed", "--out $bedfile_basename")
+        println(">>> Running PLINK2 filtering with $nthreads threads")
         run(`$plink_binpath/plink2 $(split(join(bed_cmd_args, " ")))`)
         
         # Clean up temporary files
@@ -210,9 +218,10 @@ function _qc_snps(
         !isempty(snpids_path) && push!(bed_cmd_args, "--extract $snpids_path")
         
         # Add common filters and output options
-        append!(bed_cmd_args, common_filters)
+        append!(bed_cmd_args, common_filters) # Skip the --threads that's already included
         push!(bed_cmd_args, "--make-bed", "--out $bedfile_basename")
         
+        println(">>> Running PLINK2 with $nthreads threads")
         run(`$plink_binpath/plink2 $(split(join(bed_cmd_args, " ")))`)
     end
 end
