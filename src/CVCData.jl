@@ -175,6 +175,10 @@ function align!(
     
     status("Starting alignment process")
     
+    # Add thread detection at the beginning
+    nthreads = haskey(ENV, "NSLOTS") ? parse(Int, ENV["NSLOTS"]) : Threads.nthreads()
+    status("Detected $nthreads threads for PLINK operations")
+    
     # Read covariate IDs
     status("Reading covariate data from $covdir/wdf.txt")
     covpath = "$covdir/wdf.txt"
@@ -258,11 +262,12 @@ function align!(
         CSV.write("$aligned_cov_out/wdf.txt", wdf; delim="\t", header=true)
         CSV.write("$aligned_cov_out/w.txt",   w;    delim="\t", header=false)
 
-        # PLINK‐filter genotype
-        status("Starting PLINK filtering for $K partitions")
+        # PLINK‐filter genotype with threading
+        status("Starting PLINK filtering for $K partitions using $nthreads threads")
         for k in 1:K
             status("  - Filtering partition $k/$K with PLINK")
             cmd = `$(gp.plink_binpath)/plink2 \
+                   --threads $nthreads \
                    --bfile $part_genodir/G$(k) \
                    --keep-fam $aligned_partgeno_out/id.txt \
                    --make-bed \
