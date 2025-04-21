@@ -34,7 +34,7 @@ function GenoArch(
     normalize::Bool=false,
     rng::AbstractRNG=Random.MersenneTwister(2024)
     )
-    N = gp.N
+    N = gp.N[]
     M = gp.M
     rho = gp.rho
     qced_genodir = gp.qced_genodir
