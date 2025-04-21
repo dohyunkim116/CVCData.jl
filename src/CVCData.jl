@@ -209,49 +209,64 @@ function align!(
     covdir_parent = dirname(covdir)
     geno_parent   = dirname(part_genodir)
 
-    cov_out  = joinpath(covdir_parent,
+    aligned_cov_out  = joinpath(covdir_parent,
         "aligned_cov_N_$(n)_C_$(c)_K_$(K)_rho_$(gp.rho)_ldtype_$(gp.ldtype)")
-    geno_out = joinpath(geno_parent,
+    aligned_partgeno_out = joinpath(geno_parent,
         "aligned_partgeno_N_$(n)_C_$(c)_K_$(K)_rho_$(gp.rho)_ldtype_$(gp.ldtype)")
 
     if need_alignment
-        mkpath(cov_out);  mkpath(geno_out)
+        mkpath(aligned_cov_out);  mkpath(aligned_partgeno_out)
         # write aligned IDs and filter
-        CSV.write("$geno_out/id.txt", DataFrame(FID=id, IID=id);
+        CSV.write("$aligned_partgeno_out/id.txt", DataFrame(FID=id, IID=id);
                   delim="\t", header=false)
         mask = in.(string.(wdf."f.eid"), Ref(id))
         w   = wdf[mask, Not(:"f.eid")]
         wdf = wdf[mask, :]
-        CSV.write("$cov_out/wdf.txt", wdf; delim="\t", header=true)
-        CSV.write("$cov_out/w.txt",   w;    delim="\t", header=false)
+        CSV.write("$aligned_cov_out/wdf.txt", wdf; delim="\t", header=true)
+        CSV.write("$aligned_cov_out/w.txt",   w;    delim="\t", header=false)
 
         # PLINK‐filter genotype
         for k in 1:K
-            cmd = `$gp.plink_binpath/plink2 \
+            cmd = `$(gp.plink_binpath)/plink2 \
                    --bfile $part_genodir/G$(k) \
-                   --keep-fam $geno_out/id.txt \
+                   --keep-fam $aligned_partgeno_out/id.txt \
                    --make-bed \
-                   --out $geno_out/G$(k)`
+                   --out $aligned_partgeno_out/G$(k)`
             run(cmd)
         end
     else
         # no alignment → symlink originals
-        mkpath(cov_out);  mkpath(geno_out)
-        CSV.write("$geno_out/id.txt", DataFrame(FID=id, IID=id);
+        mkpath(aligned_cov_out);  mkpath(aligned_partgeno_out)
+        CSV.write("$aligned_partgeno_out/id.txt", DataFrame(FID=id, IID=id);
                   delim="\t", header=false)
         for f in ["wdf.txt","w.txt"]
-            src, dst = joinpath(covdir,f), joinpath(cov_out,f)
+            src, dst = joinpath(covdir,f), joinpath(aligned_cov_out,f)
             isfile(dst) && rm(dst);  isfile(src) && symlink(src,dst)
         end
         for k in 1:K, ext in [".bed",".bim",".fam"]
-            src, dst = joinpath(part_genodir,"G$k$ext"), joinpath(geno_out,"G$k$ext")
+            src, dst = joinpath(part_genodir,"G$k$ext"), joinpath(aligned_partgeno_out,"G$k$ext")
             isfile(dst) && rm(dst);  isfile(src) && symlink(src,dst)
         end
     end
 
-    # Update gp and return only the two dirs
-    gp.part_genodir[] = geno_out
-    return cov_out, geno_out
+    # Create a deep copy of the original GenoPart object
+    aligned_gp = deepcopy(gp)
+    
+    # Update the aligned GenoPart with the new sample size and directory
+    update_N!(aligned_gp, n)  # Update sample size to the aligned count
+    aligned_gp.part_genodir[] = aligned_partgeno_out
+    
+    # Save the aligned GenoPart object
+    aligned_objpath = joinpath(aligned_gp.part_genoobj_dir, 
+        "aligned_$(basename(get_objname(aligned_gp))).jls")
+    open(aligned_objpath, "w") do io
+        serialize(io, aligned_gp)
+    end
+    
+    println("Aligned GenoPart saved to: $aligned_objpath")
+    
+    # Return both directories and the aligned GenoPart object
+    return aligned_cov_out, aligned_partgeno_out, aligned_gp
 end
 
 function check_alignment(
