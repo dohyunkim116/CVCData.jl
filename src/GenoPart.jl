@@ -9,7 +9,7 @@ export
     convert_bin_names!
     
 struct GenoPart
-    N::Int
+    N::Vector{Int}  # Changed from N::Int to Vector{Int}
     M::Int
     K::Vector
     rho::AbstractFloat
@@ -45,7 +45,7 @@ function GenoPart(
     annot_path::AbstractString=""
     )
     mkpath(part_genodir_parent)
-    N = get_N(g)
+    N = [get_N(g)]  # Initialize as Vector{Int} with one element
     M = get_M(g)
     K = Vector{Int}(undef, 1)
     nmafbins = isempty(mafknots) ? nmafbins : length(mafknots) + 1
@@ -193,12 +193,12 @@ function update_part_genodir!(gp::GenoPart)
         if !gp.imputed
             newdir = 
                 "$(gp.part_genodir_parent)/part_geno_chrs_$(chrstart)_to_$(chrend)\
-                _N_$(gp.N)_M_$(gp.M)_K_$(gp.K[])_rho_$(gp.rho)_ldtype_$(gp.ldtype)_nldbins_$(nldbins)_nmafbins_$(nmafbins)\
+                _N_$(gp.N[1])_M_$(gp.M)_K_$(gp.K[])_rho_$(gp.rho)_ldtype_$(gp.ldtype)_nldbins_$(nldbins)_nmafbins_$(nmafbins)\
                 _nmafbins_per_interval_$(nmafbins_per_interval)"
         else
             newdir = 
                 "$(gp.part_genodir_parent)/part_imputed_geno_chrs_$(chrstart)_to_$(chrend)\
-                _N_$(gp.N)_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)_ldtype_$(gp.ldtype)_nldbins_$(nldbins)_nmafbins_$(nmafbins)\
+                _N_$(gp.N[1])_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)_ldtype_$(gp.ldtype)_nldbins_$(nldbins)_nmafbins_$(nmafbins)\
                 _nmafbins_per_interval_$(nmafbins_per_interval)"
         end
         
@@ -206,11 +206,11 @@ function update_part_genodir!(gp::GenoPart)
         if !gp.imputed
             newdir = 
                 "$(gp.part_genodir_parent)/annot_part_geno_chrs_$(chrstart)_to_$(chrend)\
-                _N_$(gp.N)_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)"
+                _N_$(gp.N[1])_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)"
         else
             newdir = 
                 "$(gp.part_genodir_parent)/annot_part_imputed_geno_chrs_$(chrstart)_to_$(chrend)\
-                _N_$(gp.N)_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)"
+                _N_$(gp.N[1])_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)"
         end
     end
     mv("$(gp.part_genodir[1])", newdir, force=true)
@@ -257,15 +257,15 @@ end
 function get_objname(gp::GenoPart)
     if !gp.isannot
         if gp.imputed
-            return "part_imputed_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N)_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)_ldtype_$(gp.ldtype)"
+            return "part_imputed_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N[1])_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)_ldtype_$(gp.ldtype)"
         else
-            return "part_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N)_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)_ldtype_$(gp.ldtype)"
+            return "part_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N[1])_M_$(gp.M)_K_$(gp.K[1])_rho_$(gp.rho)_ldtype_$(gp.ldtype)"
         end
     else
         if gp.imputed
-            return "annot_part_imputed_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N)_M_$(gp.M)_rho_$(gp.rho)"
+            return "annot_part_imputed_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N[1])_M_$(gp.M)_rho_$(gp.rho)"
         else
-            return "annot_part_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N)_M_$(gp.M)_rho_$(gp.rho)"
+            return "annot_part_geno_chrs_$(gp.chrs[1])_to_$(gp.chrs[end])_N_$(gp.N[1])_M_$(gp.M)_rho_$(gp.rho)"
         end
     end
 end
@@ -464,7 +464,7 @@ function convert_bin_names!(
 end
 
 # getters
-get_N(gp::GenoPart) = gp.N
+get_N(gp::GenoPart) = gp.N[1]
 get_M(gp::GenoPart) = gp.M
 get_K(gp::GenoPart) = gp.K[1]
 get_part_genodir(gp::GenoPart) = gp.part_genodir[1]
@@ -476,6 +476,11 @@ get_sla_array(gp::GenoPart) = gp.sla_array
 get_conditional_ldbin(gp::GenoPart) = gp.conditional_ldbin
 get_conditional_mafbin(gp::GenoPart) = gp.conditional_mafbin
 get_nmafbins_per_interval(gp::GenoPart) = gp.conditional_mafbin ? gp.nmafbins_per_interval : zero(Int)
+
+# Add a setter for updating N after alignment
+function update_N!(gp::GenoPart, new_N::Int)
+    gp.N[1] = new_N
+end
 
 function merge_geno(
     gp::GenoPart,
