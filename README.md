@@ -13,7 +13,7 @@ $$
 \sigma_j^2 = c_jw_j^b[f_j(1-f_j)]^a
 $$
 
-where $\sigma_j^2$ is the genetic variance component, $c_j$ is the causal variant status, $w_j$ is the [LDAK score](https://dougspeed.com/calculate-weightings/), and $f_j$ is MAF of the $j$th SNP. $a$ and $b$ are the parameters modulating the impact of LD and MAF on the genetic variance component, respectively.
+where $\sigma_j^2$ is the genetic variance component, $c_j$ is the causal variant status, $w_j$ is the [LDAK score](https://dougspeed.com/calculate-weightings/), and $f_j$ is MAF of the $j$-th SNP. $a$ and $b$ are the parameters modulating the impact of LD and MAF on the genetic variance component, respectively.
 
 
  This package enables both the partitioning of genetic data based on MAF and LD and simulation of right-censored phenotypes under different genetic architectures governed by causal variant ratio, MAF and LD. The generative model is given by
