@@ -1,11 +1,11 @@
 # CVCData
 
 [![Build Status](https://github.com/dohyunkim116/CVCData.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/dohyunkim116/CVCData.jl/actions/workflows/CI.yml)
-
-A Julia package for preparing partitioned genetic data with different genetic architectures for heritability analysis using the Censored Variance Component (CVC) method.
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 <!-- [![Coverage Status](https://coveralls.io/repos/github/dohyunkim116/CVCData.jl/badge.svg?branch=main)](https://coveralls.io/github/dohyunkim116/CVCData.jl?branch=main)
 [![Documentation Status](https://readthedocs.org/projects/cvcdata/badge/?version=latest)](https://cvcdata.readthedocs.io/en/latest/?badge=latest) -->
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+A Julia package for preparing partitioned genetic data with different genetic architectures for heritability analysis using the Censored Variance Component (CVC) method.
 
 ## Installation
 
@@ -14,8 +14,6 @@ using Pkg
 Pkg.add("CVCData")
 ```
 The package also requires PLINK2, GCTA and LDAK software executables, as the user will specify the paths of these executables when constructing `Geno` object.
-
----
 
 ## Usage
 
