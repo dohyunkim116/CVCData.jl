@@ -19,13 +19,16 @@ where $\sigma_j^2$ is the genetic variance component, $c_j$ is the causal varian
  This package enables both the partitioning of genetic data based on MAF and LD and simulation of right-censored phenotypes under different genetic architectures governed by causal variant ratio, MAF and LD. The generative model is given by
 
 $$
-\begin{align*}
- \bm{\beta}^T = (\beta_1,\beta_2,...,\beta_M)^T &\sim N(\bm{0},\mathrm{diag}(\sigma_1^2,\sigma_2^2,...,\sigma^2_M)),\\
-\bm{y}\mid \bm{\alpha}, \bm{\beta} &\sim N(\bm{W}\bm{\alpha} + \bm{X}\bm{\beta}, \sigma_e^2\bm{I}_N)
-\end{align*}
-$$ where $\bm{\beta}$ is a vector of realized genetic effects, $\bm{W}$ is a covariate matrix, $\bm{\alpha}$ is fixed effect, $\bm{X}$ is a standardized genotype matrix and $\sigma_e^2$ is the environmental variance component.
+\mathbf{\beta}^T = (\beta_1,\beta_2,...,\beta_M)^T \sim N(\mathbf{0},\mathrm{diag}(\sigma_1^2,\sigma_2^2,...,\sigma^2_M))
+$$
 
-To generate right-censored variables $\bm{u}$ with desired censoring rate $\Delta$, we simulated censoring variables $c_i = c_i(\mu_c)$ using the following generative model:
+$$
+\mathbf{y}\mid \mathbf{\alpha}, \mathbf{\beta} \sim N(\mathbf{W}\mathbf{\alpha} + \mathbf{X}\mathbf{\beta}, \sigma_e^2\mathbf{I}_N)
+$$
+
+where $\mathbf{\beta}$ is a vector of realized genetic effects, $\mathbf{W}$ is a covariate matrix, $\mathbf{\alpha}$ is fixed effect, $\mathbf{X}$ is a standardized genotype matrix and $\sigma_e^2$ is the environmental variance component.
+
+To generate right-censored variables $\mathbf{u}$ with desired censoring rate $\Delta$, we simulated censoring variables $c_i = c_i(\mu_c)$ using the following generative model:
 $$
         c_1,...,c_N \overset{\text{i.i.d}}{\sim}  \mu_c + \sigma_e N(0,1)
 $$ where $\mu_c$ is the solution of the equation
