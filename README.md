@@ -29,12 +29,18 @@ $$
 where $\mathbf{\beta}$ is a vector of realized genetic effects, $\mathbf{W}$ is a covariate matrix, $\mathbf{\alpha}$ is fixed effect, $\mathbf{X}$ is a standardized genotype matrix and $\sigma_e^2$ is the environmental variance component.
 
 To generate right-censored variables $\mathbf{u}$ with desired censoring rate $\Delta$, we simulated censoring variables $c_i = c_i(\mu_c)$ using the following generative model:
+
 $$
         c_1,...,c_N \overset{\text{i.i.d}}{\sim}  \mu_c + \sigma_e N(0,1)
-$$ where $\mu_c$ is the solution of the equation
+$$ 
+
+where $\mu_c$ is the solution of the equation
+
 $$
             \frac{\sum_{i = 1}^N 1_{\{y_i > c_i(\mu_c)\}}}{N}  - \Delta = 0.
-$$ We set $u_i = \min(y_i, c_i)$ for $i = 1,...,N$.
+$$ 
+
+We set $u_i = \min(y_i, c_i)$ for $i = 1,...,N$.
 
 
 ## Installation
