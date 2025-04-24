@@ -37,7 +37,7 @@ $$
 where $\mu_c$ is the solution of the equation
 
 $$
-            \frac{\sum_{i = 1}^N 1_{\{y_i > c_i(\mu_c)\}}}{N}  - \Delta = 0.
+            \frac{\sum_{i = 1}^N I(y_i > c_i(\mu_c))}{N}  - \Delta = 0.
 $$ 
 
 We set $u_i = \min(y_i, c_i)$ for $i = 1,...,N$.
