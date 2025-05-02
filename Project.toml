@@ -28,7 +28,7 @@ Glob = "1"
 JLD2 = "0.5"
 Roots = "2"
 SnpArrays = "0.3.22"  # If this is the correct version
-StatsBase = "0.34"
+StatsBase = "0.24 - 0.34"
 TextWrap = "1"
 
 [extras]
