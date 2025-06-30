@@ -271,6 +271,7 @@ function align!(
                    --threads $nthreads \
                    --bfile $part_genodir/G$(k) \
                    --keep-fam $aligned_partgeno_out/id.txt \
+                   --indiv-sort f \
                    --make-bed \
                    --out $aligned_partgeno_out/G$(k)`
             run(cmd)
@@ -298,8 +299,8 @@ function align!(
     status("Verifying alignment between covariate and genotype files")
     if !check_alignment(aligned_cov_out, aligned_partgeno_out)
         status("Alignment verification failed, cleaning up")
-        rmdir(aligned_cov_out, recursive=true)
-        rmdir(aligned_partgeno_out, recursive=true)
+        rm(aligned_cov_out, recursive=true)
+        rm(aligned_partgeno_out, recursive=true)
         error("Alignment check failed: covariate and genotype IDs do not match after alignment.")
     end
     status("Alignment verification successful")
