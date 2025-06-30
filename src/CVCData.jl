@@ -250,17 +250,18 @@ function align!(
         mkpath(aligned_cov_out);  mkpath(aligned_partgeno_out)
         
         # write aligned IDs and filter
-        status("Writing aligned ID file")
-        CSV.write("$aligned_partgeno_out/id.txt", DataFrame(FID=id, IID=id);
-                  delim="\t", header=false)
-        
-        # Filter and write covariates
         status("Filtering and writing covariate files")
         mask = in.(string.(wdf."f.eid"), Ref(id))
-        w   = wdf[mask, Not(:"f.eid")]
         wdf = wdf[mask, :]
+        id_to_row = Dict(string(eid) => i for (i, eid) in enumerate(wdf."f.eid"))
+        ordered_indices = [id_to_row[i] for i in id]
+        wdf = wdf[ordered_indices, :]
+        w = wdf[:, Not(:"f.eid")]        
         CSV.write("$aligned_cov_out/wdf.txt", wdf; delim="\t", header=true)
-        CSV.write("$aligned_cov_out/w.txt",   w;    delim="\t", header=false)
+        CSV.write("$aligned_cov_out/w.txt", w; delim="\t", header=false)
+
+        status("Writing aligned ID file for PLINK filtering")
+        CSV.write("$aligned_partgeno_out/id.txt", DataFrame(FID=id, IID=id); delim="\t", header=false)
 
         # PLINK‐filter genotype with threading
         status("Starting PLINK filtering for $K partitions using $nthreads threads")
@@ -294,6 +295,14 @@ function align!(
             isfile(dst) && rm(dst);  isfile(src) && symlink(src,dst)
         end
     end
+    status("Verifying alignment between covariate and genotype files")
+    if !check_alignment(aligned_cov_out, aligned_partgeno_out)
+        status("Alignment verification failed, cleaning up")
+        rmdir(aligned_cov_out, recursive=true)
+        rmdir(aligned_partgeno_out, recursive=true)
+        error("Alignment check failed: covariate and genotype IDs do not match after alignment.")
+    end
+    status("Alignment verification successful")
 
     # Create a deep copy of the original GenoPart object
     status("Creating and updating aligned GenoPart object")
