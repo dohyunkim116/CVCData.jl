@@ -271,7 +271,7 @@ function align!(
                    --threads $nthreads \
                    --bfile $part_genodir/G$(k) \
                    --keep-fam $aligned_partgeno_out/id.txt \
-                   --indiv-sort f \
+                   --indiv-sort f $aligned_partgeno_out/id.txt \
                    --make-bed \
                    --out $aligned_partgeno_out/G$(k)`
             run(cmd)
