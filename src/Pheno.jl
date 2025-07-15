@@ -4,7 +4,8 @@ function simulate_pheno!(
     s::CVCDataset,
     cr::AbstractFloat,
     rep::Int,
-    phenodir_parent::AbstractString
+    phenodir_parent::AbstractString;
+    pheno_dist = "normal"
 )
     sa_array = Array{SnpArray, 1}(undef, s.K);
     T = eltype(s.ηw)
@@ -18,13 +19,23 @@ function simulate_pheno!(
     mkpath(s.phenodir[])
     Random.seed!(rep)
     update_mean_component!(η, s.ηw, sa_array, sla_array, s.vc_array);
-    u, delta =
-        simulate_right_censored_data(
+    if pheno_dist == "normal"
+        u, delta = simulate_right_censored_data(
             length(η);
             Y_shift = η,
             Y_scale = sqrt(s.phie),
             cr = cr
-        );
+        )
+    elseif pheno_dist == "weibull"
+        u, delta = simulate_weibull(
+            length(η);
+            Y_shift = η,
+            Y_scale = sqrt(s.phie),
+            cr = cr
+        )
+    else
+        error("Unsupported pheno_dist: $pheno_dist")
+    end
     save_pheno(u, delta, s.phenodir[], rep)
 end
 

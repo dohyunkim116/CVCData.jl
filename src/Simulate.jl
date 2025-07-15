@@ -45,6 +45,51 @@ function simulate_right_censored_data(
     ỹ, isobserved
 end
 
+function simulate_weibull(
+    m           :: Integer;
+    cr          :: Real = 0.2,
+    Y_shift     = 0.0,
+    Y_scale     = 1.0
+)
+    y = Vector{Float64}(undef, m)
+    rand!(Gumbel(), y)
+    # standardize y
+    y .= (y .- mean(Gumbel())) .* inv(sqrt(var(Gumbel())))
+    # generate event times
+    y .= y .* Y_scale .+ Y_shift
+    
+    if(cr == 0) return y, ones(Bool, m) end
+    
+    σy = std(y)
+
+    c₀ = Vector{Float64}(undef, m)
+    # generate censoring times
+    rand!(Normal(), c₀)
+    # standardize c
+    c₀ .= (c₀ .- mean(Normal())) .* inv(sqrt(var(Normal())))
+    # f(μ) calculates the proportion of censoring if using μ in C = σy * c₀ + μ
+    f(μ) = begin
+        cnt = 0
+        @inbounds @simd for i in 1:m
+            if μ + σy * c₀[i] ≤ y[i]
+                cnt += 1
+            end
+            #cnt += μ + σy * c₀[i] ≤ y[i] ? 1 : 0
+        end
+        cnt / m - cr
+    end
+    μc = find_zero(f, (minimum(y) - 3σy, maximum(y) + 3σy), Bisection())
+    c  = μc .+ σy .* c₀
+    # T̃ are right-censored times
+    ỹ  = copy(y)
+    isobserved = Vector{Bool}(undef, m)
+    @inbounds @simd for i in 1:m
+        isobserved[i] = y[i] ≤ c[i]
+        if !isobserved[i]; ỹ[i] = c[i]; end
+    end
+    ỹ, isobserved
+end
+
 function _update_mean_component!(
     out::Vector{T},
     sa_array::Array{SnpArray, 1},
