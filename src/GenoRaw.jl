@@ -11,7 +11,9 @@ function simulate_geno(
     save_unpartitioned::Bool = false,
     compress_partitioned::Bool = false,
     compress_unpartitioned::Bool = true,
-    )
+    make_pgen::Bool = false,
+    plink_bindir::Union{AbstractString, Nothing} = nothing
+)
     @assert M == size(mafs, 1) "The length of MAFs should be equal to M"
     mkpath(genodir)
     open("$genodir/MAFs_true.txt", "w+") do stream
@@ -36,6 +38,20 @@ function simulate_geno(
         if compress_unpartitioned
             compress_plink("$genodir/G")
             rm("$genodir/G.bed")
+        end
+    end
+    nt = Threads.nthreads()
+    if make_pgen
+        @assert plink_bindir !== nothing "plink_bindir must be provided to make pgen files"
+        for chr in 1:K
+            println("Generating pgen files for chromosome $chr...")
+            args = [
+                "--bfile $(genodir)/G$(chr)",
+                "--make-pgen",
+                "--out $(genodir)/G$(chr)",
+                "--threads $nt"
+            ]
+            run(`$(joinpath(plink_bindir, "plink2")) $(split(join(args, " ")))`)
         end
     end
 end
