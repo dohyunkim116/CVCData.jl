@@ -45,7 +45,7 @@ function simulate_right_censored_data(
     ỹ, isobserved
 end
 
-function simulate_weibull(
+function simulate_gumbel(
     m           :: Integer;
     cr          :: Real = 0.2,
     Y_shift     = 0.0,
