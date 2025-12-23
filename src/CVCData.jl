@@ -240,14 +240,14 @@ function align!(
     status("Preparing output paths for $n individuals and $c covariates")
     aligned_cov_out  = joinpath(covdir_parent,
         "aligned_cov_N_$(n)_C_$(c)_K_$(K)_rho_$(gp.rho)_ldtype_$(gp.ldtype)")
-    aligned_partgeno_out = joinpath(geno_parent,
-        "aligned_partgeno_N_$(n)_C_$(c)_K_$(K)_rho_$(gp.rho)_ldtype_$(gp.ldtype)")
+    aligned_part_geno_out = joinpath(geno_parent,
+        "aligned_part_geno_N_$(n)_C_$(c)_K_$(K)_rho_$(gp.rho)_ldtype_$(gp.ldtype)")
     
-    status("Output paths:\n  - Covariates: $aligned_cov_out\n  - Genotypes: $aligned_partgeno_out")
+    status("Output paths:\n  - Covariates: $aligned_cov_out\n  - Genotypes: $aligned_part_geno_out")
 
     if need_alignment
         status("Starting alignment process")
-        mkpath(aligned_cov_out);  mkpath(aligned_partgeno_out)
+        mkpath(aligned_cov_out);  mkpath(aligned_part_geno_out)
         
         # write aligned IDs and filter
         status("Filtering and writing covariate files")
@@ -261,7 +261,7 @@ function align!(
         CSV.write("$aligned_cov_out/w.txt", w; delim="\t", header=false)
 
         status("Writing aligned ID file for PLINK filtering")
-        CSV.write("$aligned_partgeno_out/id.txt", DataFrame(FID=id, IID=id); delim="\t", header=false)
+        CSV.write("$aligned_part_geno_out/id.txt", DataFrame(FID=id, IID=id); delim="\t", header=false)
 
         # PLINK‐filter genotype with threading
         status("Starting PLINK filtering for $K partitions using $nthreads threads")
@@ -270,20 +270,20 @@ function align!(
             cmd = `$(gp.plink_binpath)/plink2 \
                    --threads $nthreads \
                    --bfile $part_genodir/G$(k) \
-                   --keep-fam $aligned_partgeno_out/id.txt \
-                   --indiv-sort f $aligned_partgeno_out/id.txt \
+                   --keep-fam $aligned_part_geno_out/id.txt \
+                   --indiv-sort f $aligned_part_geno_out/id.txt \
                    --make-bed \
-                   --out $aligned_partgeno_out/G$(k)`
+                   --out $aligned_part_geno_out/G$(k)`
             run(cmd)
             status("  - Completed partition $k/$K")
         end
     else
         # no alignment → symlink originals
         status("Creating symbolic links (no filtering required)")
-        mkpath(aligned_cov_out);  mkpath(aligned_partgeno_out)
+        mkpath(aligned_cov_out);  mkpath(aligned_part_geno_out)
         
         status("Writing ID file and creating covariate symlinks")
-        CSV.write("$aligned_partgeno_out/id.txt", DataFrame(FID=id, IID=id);
+        CSV.write("$aligned_part_geno_out/id.txt", DataFrame(FID=id, IID=id);
                   delim="\t", header=false)
         for f in ["wdf.txt","w.txt"]
             src, dst = joinpath(covdir,f), joinpath(aligned_cov_out,f)
@@ -292,15 +292,15 @@ function align!(
         
         status("Creating genotype file symlinks")
         for k in 1:K, ext in [".bed",".bim",".fam"]
-            src, dst = joinpath(part_genodir,"G$k$ext"), joinpath(aligned_partgeno_out,"G$k$ext")
+            src, dst = joinpath(part_genodir,"G$k$ext"), joinpath(aligned_part_geno_out,"G$k$ext")
             isfile(dst) && rm(dst);  isfile(src) && symlink(src,dst)
         end
     end
     status("Verifying alignment between covariate and genotype files")
-    if !check_alignment(aligned_cov_out, aligned_partgeno_out)
+    if !check_alignment(aligned_cov_out, aligned_part_geno_out)
         status("Alignment verification failed, cleaning up")
         rm(aligned_cov_out, recursive=true)
-        rm(aligned_partgeno_out, recursive=true)
+        rm(aligned_part_geno_out, recursive=true)
         error("Alignment check failed: covariate and genotype IDs do not match after alignment.")
     end
     status("Alignment verification successful")
@@ -312,7 +312,7 @@ function align!(
     # Update the aligned GenoPart with the new sample size and directory
     status("Updating sample count to $n and directory path")
     update_N!(aligned_gp, n)  # Update sample size to the aligned count
-    aligned_gp.part_genodir[] = aligned_partgeno_out
+    aligned_gp.part_genodir[] = aligned_part_geno_out
     
     # Save the aligned GenoPart object
     aligned_objpath = joinpath(aligned_gp.part_genoobj_dir, 
@@ -325,16 +325,16 @@ function align!(
     status("Alignment complete")
     
     # Return both directories and the aligned GenoPart object
-    return aligned_cov_out, aligned_partgeno_out, aligned_gp
+    return aligned_cov_out, aligned_part_geno_out, aligned_gp
 end
 
 function check_alignment(
     covdir::AbstractString,
-    partgenodir::AbstractString
+    part_genodir::AbstractString
     )
     wdf = CSV.read("$covdir/wdf.txt", DataFrame);
     id_cov = string.(Int.(wdf."f.eid"));
-    fampath = get_fampath(partgenodir);
+    fampath = get_fampath(part_genodir);
     id_geno = vec(string.(Int.(readdlm(fampath)[:,1])));
     return id_cov == id_geno
 end
