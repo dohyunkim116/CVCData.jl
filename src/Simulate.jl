@@ -210,6 +210,54 @@ function simulate_right_censored_data_random(
     ỹ, isobserved
 end
 
+function simulate_conditional_independence(
+    m           :: Integer;
+    factor      :: Real = 1.0,
+    cr          :: Real = 0.2,
+    Y_dist      :: Distributions.UnivariateDistribution = Normal(),
+    C_dist      :: Distributions.UnivariateDistribution = Normal(),
+    Y_shift     = 0.0,
+    Y_scale     = 1.0
+)
+    y = Vector{Float64}(undef, m)
+    rand!(Y_dist, y)
+    # standardize y
+    y .= (y .- mean(Y_dist)) .* inv(sqrt(var(Y_dist)))
+    # generate event times
+    y .= y .* Y_scale .+ Y_shift
+    
+    if(cr == 0) return y, ones(Bool, m) end
+    
+    σy = std(y)
+    c₀ = Vector{Float64}(undef, m)
+    # generate censoring times
+    rand!(C_dist, c₀)
+    # standardize c
+    Y_shift_adj = factor * Y_shift
+    c₀ .= (c₀ .- mean(C_dist)) .* inv(sqrt(var(C_dist)))
+    # f(μ) calculates the proportion of censoring if using μ in C = σy * c₀ + μ
+    f(μ) = begin
+        cnt = 0
+        @inbounds @simd for i in 1:m
+            if Y_shift_adj[i] + μ + σy * c₀[i] ≤ y[i]
+                cnt += 1
+            end
+            #cnt += μ + σy * c₀[i] ≤ y[i] ? 1 : 0
+        end
+        cnt / m - cr
+    end
+    μc = find_zero(f, (minimum(y) - 3σy, maximum(y) + 3σy), Bisection())
+    c  = Y_shift_adj .+ μc .+ σy .* c₀
+    # T̃ are right-censored times
+    ỹ  = copy(y)
+    isobserved = Vector{Bool}(undef, m)
+    @inbounds @simd for i in 1:m
+        isobserved[i] = y[i] ≤ c[i]
+        if !isobserved[i]; ỹ[i] = c[i]; end
+    end
+    ỹ, isobserved, y, c
+end
+
 function update_mean_component!(
     η::Vector{T},
     ηw::Vector{T},
