@@ -5,7 +5,8 @@ function simulate_pheno!(
     cr::AbstractFloat,
     rep::Int,
     phenodir_parent::AbstractString;
-    pheno_dist = "normal"
+    pheno_dist = "normal",
+    factor = 1.0
 )
     sa_array = Array{SnpArray, 1}(undef, s.K);
     T = eltype(s.ηw)
@@ -26,12 +27,34 @@ function simulate_pheno!(
             Y_scale = sqrt(s.phie),
             cr = cr
         )
-    elseif pheno_dist == "weibull"
-        u, delta = simulate_weibull(
+    elseif pheno_dist == "gumbel"
+        u, delta = simulate_gumbel(
             length(η);
             Y_shift = η,
             Y_scale = sqrt(s.phie),
             cr = cr
+        )
+    elseif pheno_dist == "logistic"
+        u, delta = simulate_logistic(
+            length(η);
+            Y_shift = η,
+            Y_scale = sqrt(s.phie),
+            cr = cr
+        )
+    elseif pheno_dist == "mixture_normal"
+        u, delta = simulate_mixture_normal(
+            length(η);
+            Y_shift = η,
+            Y_scale = sqrt(s.phie),
+            cr = cr
+        )
+    elseif pheno_dist == "conditional_independence"
+        u, delta = simulate_conditional_independence(
+            length(η);
+            Y_shift = η,
+            Y_scale = sqrt(s.phie),
+            cr = cr,
+            factor = factor
         )
     else
         error("Unsupported pheno_dist: $pheno_dist")
