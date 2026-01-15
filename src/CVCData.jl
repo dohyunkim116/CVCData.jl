@@ -165,6 +165,7 @@ end
 function align!(
     gp::GenoPart,
     covdir::AbstractString;
+    alignedcovdir::Union{AbstractString, Nothing}=nothing,
     subjectidspath::Union{AbstractString, Nothing}=nothing
     )
     # Progress tracking
@@ -235,10 +236,11 @@ function align!(
     c = size(wdf,2)-1
     K = get_k(part_genodir)
     covdir_parent = dirname(covdir)
+    alignedcovdir = isnothing(alignedcovdir) ? covdir_parent : alignedcovdir
     geno_parent   = dirname(part_genodir)
 
     status("Preparing output paths for $n individuals and $c covariates")
-    aligned_cov_out  = joinpath(covdir_parent,
+    aligned_cov_out  = joinpath(alignedcovdir,
         "aligned_cov_N_$(n)_C_$(c)_K_$(K)_rho_$(gp.rho)_ldtype_$(gp.ldtype)")
     aligned_part_geno_out = joinpath(geno_parent,
         "aligned_part_geno_N_$(n)_C_$(c)_K_$(K)_rho_$(gp.rho)_ldtype_$(gp.ldtype)")
