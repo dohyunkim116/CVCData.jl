@@ -213,6 +213,7 @@ end
 function simulate_conditional_independence(
     m           :: Integer;
     factor      :: Real = 1.0,
+    covariate_shift :: AbstractVector{Float64} = zeros(m),
     cr          :: Real = 0.2,
     Y_dist      :: Distributions.UnivariateDistribution = Normal(),
     C_dist      :: Distributions.UnivariateDistribution = Normal(),
@@ -233,7 +234,7 @@ function simulate_conditional_independence(
     # generate censoring times
     rand!(C_dist, c₀)
     # standardize c
-    Y_shift_adj = factor * Y_shift
+    Y_shift_adj = factor * covariate_shift
     c₀ .= (c₀ .- mean(C_dist)) .* inv(sqrt(var(C_dist)))
     # f(μ) calculates the proportion of censoring if using μ in C = σy * c₀ + μ
     f(μ) = begin
